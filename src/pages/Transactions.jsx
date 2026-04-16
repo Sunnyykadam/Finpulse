@@ -72,7 +72,7 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
       setForm({
         date_time: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
         type: 'expense', amount: '', payment_method: 'cash',
-        category: 'Food', linked_goal_id: '', note: '',
+        category: 'Food', customCategoryName: '', linked_goal_id: '', note: '',
         is_split: false, split_cash_amount: '', split_bank_amount: '', receipt_url: ''
       })
     }
@@ -142,7 +142,7 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
       type: form.type,
       amount: Number(form.amount),
       payment_method: form.is_split ? 'cash' : form.payment_method,
-      category: form.category,
+      category: form.category === 'Custom...' ? (form.customCategoryName || 'Custom') : form.category,
       linked_goal_id: form.linked_goal_id || null,
       note: form.note,
       is_split: form.is_split,
@@ -156,6 +156,11 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={editData ? 'Edit Transaction' : 'Add Transaction'} size="lg">
+      <style>{`
+        .tx-form input[type="number"]::-webkit-inner-spin-button,
+        .tx-form input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        .tx-form input[type="number"] { -moz-appearance: textfield; }
+      `}</style>
       <form onSubmit={handleSubmit} className="tx-form">
         <div className="form-group">
           <label>Date & Time</label>
@@ -166,12 +171,12 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
         <div className="form-group">
           <label>Type</label>
           <div className="type-toggle">
-            {['income', 'expense', 'transfer'].map(t => (
+            {['income', 'expense'].map(t => (
               <button key={t} type="button"
                 className={`type-btn ${form.type === t ? 'active' : ''}`}
-                style={form.type === t ? { background: TYPE_COLORS[t], color: '#fff' } : {}}
+                style={form.type === t ? { background: t === 'income' ? '#3B82F6' : '#EF4444', color: '#fff' } : {}}
                 onClick={() => setForm(f => ({ ...f, type: t }))}>
-                {t.charAt(0).toUpperCase() + t.slice(1)}
+                {t === 'income' ? 'Credit' : 'Debit'}
               </button>
             ))}
           </div>
@@ -263,10 +268,17 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
           <label>Category</label>
           <select value={form.category}
             onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-            {CATEGORIES.map(c => (
+            {CATEGORIES.filter(c => c.value !== 'Other').map(c => (
               <option key={c.value} value={c.value}>{c.emoji} {c.value}</option>
             ))}
+            <option value="Custom...">➕ Custom...</option>
           </select>
+          {form.category === 'Custom...' && (
+            <input type="text" placeholder="Enter custom category name" style={{marginTop: 8}}
+              value={form.customCategoryName || ''}
+              onChange={e => setForm(f => ({...f, customCategoryName: e.target.value}))}
+            />
+          )}
         </div>
 
         {goals.length > 0 && (
