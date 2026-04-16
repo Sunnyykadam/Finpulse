@@ -28,12 +28,18 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [shake, setShake] = useState(false)
-  const { signIn, user } = useAuth()
+  const { signIn, user, isRemembered } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+
+  // Pre-fill remember-me state from previous session
+  useEffect(() => {
+    setRememberMe(isRemembered())
+  }, [])
 
   useEffect(() => {
     if (user) navigate('/dashboard', { replace: true })
@@ -60,7 +66,7 @@ export default function Login() {
     setError('')
     setIsLoading(true)
     try {
-      const { data, error: authError } = await signIn(email, password)
+      const { data, error: authError } = await signIn(email, password, rememberMe)
       if (authError) {
         setError(authError.message || 'Invalid credentials')
         setShake(true)
@@ -123,7 +129,7 @@ export default function Login() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                autoComplete="current-password"
+                autoComplete={rememberMe ? 'current-password' : 'off'}
                 className={error ? 'input-error' : ''}
               />
               <button
@@ -139,7 +145,27 @@ export default function Login() {
 
           {error && <p className="error-message">{error}</p>}
 
-
+          {/* Remember Me */}
+          <div className="remember-me-row">
+            <label className="remember-me-label" htmlFor="rememberMe">
+              <div
+                className={`remember-me-checkbox ${rememberMe ? 'checked' : ''}`}
+                onClick={() => setRememberMe(!rememberMe)}
+                id="rememberMe"
+                role="checkbox"
+                aria-checked={rememberMe}
+                tabIndex={0}
+                onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && setRememberMe(!rememberMe)}
+              >
+                {rememberMe && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </div>
+              <span>Remember me</span>
+            </label>
+          </div>
 
           <button
             type="submit"
