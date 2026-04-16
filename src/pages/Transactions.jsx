@@ -16,6 +16,13 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 
+// Helper: determine which balance a payment method affects
+const getBalanceKey = (method) => {
+  if (method === 'cash') return 'cash_balance'
+  // bank, upi, card all deduct from bank balance
+  return 'bank_balance'
+}
+
 const CATEGORIES = [
   { value: 'Food', emoji: '🍔' }, { value: 'Rent', emoji: '🏠' },
   { value: 'Salary', emoji: '💰' }, { value: 'EMI', emoji: '🏦' },
@@ -34,7 +41,7 @@ const PAYMENT_METHODS = [
 
 const TYPE_COLORS = { income: '#22C55E', expense: '#EF4444', transfer: '#4F46E5' }
 
-function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [] }) {
+function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cashBalance = 0, bankBalance = 0 }) {
   const [form, setForm] = useState({
     date_time: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     type: 'expense',
@@ -104,6 +111,32 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [] }) {
         return
       }
     }
+
+    // --- Insufficient balance check for expenses ---
+    if (form.type === 'expense' && !editData) {
+      const amount = Number(form.amount)
+      if (form.is_split) {
+        const cashAmt = Number(form.split_cash_amount || 0)
+        const bankAmt = Number(form.split_bank_amount || 0)
+        if (cashAmt > cashBalance) {
+          toast.error(`Insufficient Cash Balance! Available: ₹${cashBalance.toLocaleString('en-IN')}`)
+          return
+        }
+        if (bankAmt > bankBalance) {
+          toast.error(`Insufficient Bank Balance! Available: ₹${bankBalance.toLocaleString('en-IN')}`)
+          return
+        }
+      } else {
+        const balanceKey = getBalanceKey(form.payment_method)
+        const availableBalance = balanceKey === 'cash_balance' ? cashBalance : bankBalance
+        const balanceLabel = balanceKey === 'cash_balance' ? 'Cash' : 'Bank'
+        if (amount > availableBalance) {
+          toast.error(`Insufficient ${balanceLabel} Balance! Available: ₹${availableBalance.toLocaleString('en-IN')}`)
+          return
+        }
+      }
+    }
+
     const payload = {
       date_time: new Date(form.date_time).toISOString(),
       type: form.type,
@@ -165,6 +198,40 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [] }) {
               </button>
             ))}
           </div>
+          {form.type === 'expense' && !form.is_split && (
+            <div className="balance-hint" style={{
+              marginTop: 8, padding: '6px 12px', borderRadius: 8, fontSize: '0.82rem', fontWeight: 500,
+              background: (Number(form.amount || 0) > (getBalanceKey(form.payment_method) === 'cash_balance' ? cashBalance : bankBalance))
+                ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
+              color: (Number(form.amount || 0) > (getBalanceKey(form.payment_method) === 'cash_balance' ? cashBalance : bankBalance))
+                ? '#EF4444' : '#22C55E',
+              display: 'flex', alignItems: 'center', gap: 6
+            }}>
+              {(Number(form.amount || 0) > (getBalanceKey(form.payment_method) === 'cash_balance' ? cashBalance : bankBalance))
+                ? '⚠️' : '💰'}
+              Available {getBalanceKey(form.payment_method) === 'cash_balance' ? 'Cash' : 'Bank'} Balance: ₹{(getBalanceKey(form.payment_method) === 'cash_balance' ? cashBalance : bankBalance).toLocaleString('en-IN')}
+            </div>
+          )}
+          {form.type === 'expense' && form.is_split && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div className="balance-hint" style={{
+                padding: '6px 12px', borderRadius: 8, fontSize: '0.82rem', fontWeight: 500, flex: 1,
+                background: (Number(form.split_cash_amount || 0) > cashBalance)
+                  ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
+                color: (Number(form.split_cash_amount || 0) > cashBalance) ? '#EF4444' : '#22C55E'
+              }}>
+                💵 Cash: ₹{cashBalance.toLocaleString('en-IN')}
+              </div>
+              <div className="balance-hint" style={{
+                padding: '6px 12px', borderRadius: 8, fontSize: '0.82rem', fontWeight: 500, flex: 1,
+                background: (Number(form.split_bank_amount || 0) > bankBalance)
+                  ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
+                color: (Number(form.split_bank_amount || 0) > bankBalance) ? '#EF4444' : '#22C55E'
+              }}>
+                🏦 Bank: ₹{bankBalance.toLocaleString('en-IN')}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="form-group">
@@ -310,7 +377,7 @@ function BudgetOverview({ budgets, categorySpending, onSetBudget }) {
 }
 
 export default function Transactions() {
-  const { user } = useAuth()
+  const { user, profile, updateProfile, refreshProfile } = useAuth()
   const { theme } = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const [transactions, setTransactions] = useState([])
@@ -393,12 +460,91 @@ export default function Transactions() {
 
   const handleSubmit = async (payload, editId) => {
     if (editId) {
+      // --- Reverse old transaction's balance impact, then apply new ---
+      const oldTx = transactions.find(t => t.id === editId)
       const { error } = await supabase.from('transactions').update(payload).eq('id', editId).eq('user_id', user.id)
       if (error) { toast.error('Update failed'); return }
+
+      // Reverse old balance impact
+      if (oldTx && profile) {
+        let balUpdate = {}
+        if (oldTx.is_split) {
+          const oldCash = Number(oldTx.split_cash_amount || 0)
+          const oldBank = Number(oldTx.split_bank_amount || 0)
+          if (oldTx.type === 'expense') {
+            balUpdate.cash_balance = (profile.cash_balance || 0) + oldCash
+            balUpdate.bank_balance = (profile.bank_balance || 0) + oldBank
+          } else if (oldTx.type === 'income') {
+            balUpdate.cash_balance = (profile.cash_balance || 0) - oldCash
+            balUpdate.bank_balance = (profile.bank_balance || 0) - oldBank
+          }
+        } else {
+          const key = getBalanceKey(oldTx.payment_method)
+          if (oldTx.type === 'expense') {
+            balUpdate[key] = (profile[key] || 0) + Number(oldTx.amount)
+          } else if (oldTx.type === 'income') {
+            balUpdate[key] = (profile[key] || 0) - Number(oldTx.amount)
+          }
+        }
+
+        // Apply new transaction's impact on top of reversed balance
+        if (payload.is_split) {
+          const newCash = Number(payload.split_cash_amount || 0)
+          const newBank = Number(payload.split_bank_amount || 0)
+          if (payload.type === 'expense') {
+            balUpdate.cash_balance = (balUpdate.cash_balance ?? profile.cash_balance ?? 0) - newCash
+            balUpdate.bank_balance = (balUpdate.bank_balance ?? profile.bank_balance ?? 0) - newBank
+          } else if (payload.type === 'income') {
+            balUpdate.cash_balance = (balUpdate.cash_balance ?? profile.cash_balance ?? 0) + newCash
+            balUpdate.bank_balance = (balUpdate.bank_balance ?? profile.bank_balance ?? 0) + newBank
+          }
+        } else {
+          const key = getBalanceKey(payload.payment_method)
+          const base = balUpdate[key] ?? profile[key] ?? 0
+          if (payload.type === 'expense') {
+            balUpdate[key] = base - Number(payload.amount)
+          } else if (payload.type === 'income') {
+            balUpdate[key] = base + Number(payload.amount)
+          }
+        }
+
+        if (Object.keys(balUpdate).length > 0) {
+          await updateProfile(balUpdate)
+        }
+      }
+
       toast.success('Transaction updated!')
     } else {
       const { error } = await supabase.from('transactions').insert([{ ...payload, user_id: user.id }])
       if (error) { toast.error('Add failed'); return }
+
+      // --- Auto-update balance on new transaction ---
+      if (profile) {
+        let balUpdate = {}
+        if (payload.is_split) {
+          const cashAmt = Number(payload.split_cash_amount || 0)
+          const bankAmt = Number(payload.split_bank_amount || 0)
+          if (payload.type === 'expense') {
+            balUpdate.cash_balance = (profile.cash_balance || 0) - cashAmt
+            balUpdate.bank_balance = (profile.bank_balance || 0) - bankAmt
+          } else if (payload.type === 'income') {
+            balUpdate.cash_balance = (profile.cash_balance || 0) + cashAmt
+            balUpdate.bank_balance = (profile.bank_balance || 0) + bankAmt
+          }
+        } else {
+          const key = getBalanceKey(payload.payment_method)
+          if (payload.type === 'expense') {
+            balUpdate[key] = (profile[key] || 0) - Number(payload.amount)
+          } else if (payload.type === 'income') {
+            balUpdate[key] = (profile[key] || 0) + Number(payload.amount)
+          }
+        }
+
+        if (Object.keys(balUpdate).length > 0) {
+          await updateProfile(balUpdate)
+        }
+      }
+
       toast.success('Transaction added!')
     }
     setModalOpen(false)
@@ -407,8 +553,38 @@ export default function Transactions() {
   }
 
   const handleDelete = async (id) => {
+    // Find the transaction to reverse its balance impact
+    const tx = transactions.find(t => t.id === id)
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
     if (error) { toast.error('Delete failed'); return }
+
+    // Reverse balance impact on delete
+    if (tx && profile) {
+      let balUpdate = {}
+      if (tx.is_split) {
+        const cashAmt = Number(tx.split_cash_amount || 0)
+        const bankAmt = Number(tx.split_bank_amount || 0)
+        if (tx.type === 'expense') {
+          balUpdate.cash_balance = (profile.cash_balance || 0) + cashAmt
+          balUpdate.bank_balance = (profile.bank_balance || 0) + bankAmt
+        } else if (tx.type === 'income') {
+          balUpdate.cash_balance = (profile.cash_balance || 0) - cashAmt
+          balUpdate.bank_balance = (profile.bank_balance || 0) - bankAmt
+        }
+      } else {
+        const key = getBalanceKey(tx.payment_method)
+        if (tx.type === 'expense') {
+          balUpdate[key] = (profile[key] || 0) + Number(tx.amount)
+        } else if (tx.type === 'income') {
+          balUpdate[key] = (profile[key] || 0) - Number(tx.amount)
+        }
+      }
+
+      if (Object.keys(balUpdate).length > 0) {
+        await updateProfile(balUpdate)
+      }
+    }
+
     toast.success('Transaction deleted!')
     setDeleteConfirm(null)
     fetchTransactions()
@@ -594,6 +770,8 @@ export default function Transactions() {
         onSubmit={handleSubmit}
         editData={editData}
         goals={goals}
+        cashBalance={profile?.cash_balance || 0}
+        bankBalance={profile?.bank_balance || 0}
       />
 
       {/* Delete Confirmation */}
