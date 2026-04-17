@@ -414,21 +414,56 @@ export default function Transactions() {
   }, [searchParams, setSearchParams])
 
   const [filters, setFilters] = useState({
-    dateFrom: '', dateTo: '', type: 'all',
-    categories: [], paymentMethod: 'all', search: '',
+    dateFrom: '', dateTo: '', types: [],
+    categories: [], methods: [], search: '',
     sortBy: 'date_time', sortDir: 'desc'
   })
+  const [draftFilters, setDraftFilters] = useState({
+    dateFrom: '', dateTo: '', types: [],
+    categories: [], methods: [], search: '',
+    sortBy: 'date_time', sortDir: 'desc'
+  })
+  const [timePeriod, setTimePeriod] = useState('All')
 
   const fetchTransactions = useCallback(async () => {
     if (!user) return
     setLoading(true)
     try {
       let query = supabase.from('transactions').select('*', { count: 'exact' }).eq('user_id', user.id)
-      if (filters.dateFrom) query = query.gte('date_time', new Date(filters.dateFrom).toISOString())
-      if (filters.dateTo) query = query.lte('date_time', new Date(filters.dateTo + 'T23:59:59').toISOString())
-      if (filters.type !== 'all') query = query.eq('type', filters.type)
-      if (filters.categories.length > 0) query = query.in('category', filters.categories)
-      if (filters.paymentMethod !== 'all') query = query.eq('payment_method', filters.paymentMethod)
+      
+      let finalDateFrom = filters.dateFrom
+      let finalDateTo = filters.dateTo
+      
+      if (!finalDateFrom && !finalDateTo && timePeriod !== 'All') {
+         if (timePeriod === 'This Week') {
+            const d = new Date()
+            const day = d.getDay()
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+            const start = new Date(d.setDate(diff))
+            start.setHours(0,0,0,0)
+            const end = new Date(start)
+            end.setDate(end.getDate() + 6)
+            end.setHours(23,59,59,999)
+            finalDateFrom = start.toISOString()
+            finalDateTo = end.toISOString()
+         } else if (timePeriod === 'This Month') {
+            const d = new Date()
+            const start = new Date(d.getFullYear(), d.getMonth(), 1)
+            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+            finalDateFrom = start.toISOString()
+            finalDateTo = end.toISOString()
+         }
+      } else {
+         if (finalDateFrom) finalDateFrom = new Date(finalDateFrom).toISOString()
+         if (finalDateTo) finalDateTo = new Date(finalDateTo + 'T23:59:59').toISOString()
+      }
+
+      if (finalDateFrom) query = query.gte('date_time', finalDateFrom)
+      if (finalDateTo) query = query.lte('date_time', finalDateTo)
+      
+      if (filters.types?.length > 0) query = query.in('type', filters.types)
+      if (filters.categories?.length > 0) query = query.in('category', filters.categories)
+      if (filters.methods?.length > 0) query = query.in('payment_method', filters.methods)
       if (filters.search) query = query.ilike('note', `%${filters.search}%`)
       query = query.order(filters.sortBy, { ascending: filters.sortDir === 'asc' })
       query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
@@ -441,7 +476,7 @@ export default function Transactions() {
     } finally {
       setLoading(false)
     }
-  }, [user, filters, page])
+  }, [user, filters, timePeriod, page])
 
   const fetchGoals = useCallback(async () => {
     if (!user) return
@@ -615,9 +650,36 @@ export default function Transactions() {
 
   const handleExportCSV = async () => {
     let query = supabase.from('transactions').select('*').eq('user_id', user.id)
-    if (filters.dateFrom) query = query.gte('date_time', new Date(filters.dateFrom).toISOString())
-    if (filters.dateTo) query = query.lte('date_time', new Date(filters.dateTo + 'T23:59:59').toISOString())
-    if (filters.type !== 'all') query = query.eq('type', filters.type)
+    let finalDateFrom = filters.dateFrom
+    let finalDateTo = filters.dateTo
+    if (!finalDateFrom && !finalDateTo && timePeriod !== 'All') {
+       if (timePeriod === 'This Week') {
+          const d = new Date()
+          const day = d.getDay()
+          const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+          const start = new Date(d.setDate(diff))
+          start.setHours(0,0,0,0)
+          const end = new Date(start)
+          end.setDate(end.getDate() + 6)
+          end.setHours(23,59,59,999)
+          finalDateFrom = start.toISOString()
+          finalDateTo = end.toISOString()
+       } else if (timePeriod === 'This Month') {
+          const d = new Date()
+          const start = new Date(d.getFullYear(), d.getMonth(), 1)
+          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+          finalDateFrom = start.toISOString()
+          finalDateTo = end.toISOString()
+       }
+    } else {
+       if (finalDateFrom) finalDateFrom = new Date(finalDateFrom).toISOString()
+       if (finalDateTo) finalDateTo = new Date(finalDateTo + 'T23:59:59').toISOString()
+    }
+    if (finalDateFrom) query = query.gte('date_time', finalDateFrom)
+    if (finalDateTo) query = query.lte('date_time', finalDateTo)
+    if (filters.types?.length > 0) query = query.in('type', filters.types)
+    if (filters.categories?.length > 0) query = query.in('category', filters.categories)
+    if (filters.methods?.length > 0) query = query.in('payment_method', filters.methods)
     query = query.order('date_time', { ascending: false })
     const { data } = await query
     if (data && data.length > 0) {
@@ -636,84 +698,188 @@ export default function Transactions() {
     return m ? m.icon : MoreHorizontal
   }
 
+  let activeFilterCount = 0
+  if (filters.dateFrom || filters.dateTo) activeFilterCount++
+  if (filters.types?.length > 0) activeFilterCount++
+  if (filters.categories?.length > 0) activeFilterCount++
+  if (filters.methods?.length > 0) activeFilterCount++
+  if (filters.search) activeFilterCount++
+
   return (
     <div className="page-container">
+      <style>{`
+        .tx-table-header, .tx-table-row {
+          display: grid;
+          grid-template-columns: 1.2fr 0.8fr 1.5fr 2fr 1fr 1fr 1fr;
+          gap: 16px;
+          align-items: center;
+        }
+        .filters-drawer {
+          background: var(--color-card);
+          position: absolute;
+          top: 100%;
+          right: 0;
+          width: 380px;
+          z-index: 100;
+          box-shadow: var(--shadow-lg);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-card);
+          padding: 20px;
+          margin-top: 8px;
+        }
+        .header-actions-wrapper {
+          position: relative;
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .time-filter-tabs {
+          display: inline-flex;
+          background: var(--color-input-bg);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-input);
+          padding: 4px;
+          margin-bottom: 16px;
+        }
+        .time-filter-tabs button {
+          padding: 6px 16px;
+          background: transparent;
+          border: none;
+          border-radius: calc(var(--radius-input) - 4px);
+          color: var(--color-text-secondary);
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all var(--transition);
+        }
+        .time-filter-tabs button.active {
+          background: var(--color-primary);
+          color: #fff;
+          box-shadow: var(--shadow-sm);
+        }
+      `}</style>
       <div className="page-title-row">
         <h1 className="page-title">Transactions</h1>
-        <div className="page-actions">
-          <button className="btn btn-ghost" onClick={() => setShowFilters(!showFilters)}>
-            <Filter size={16} /> Filters
+        <div className="header-actions-wrapper">
+          <button className="btn btn-ghost" onClick={() => {
+            setShowFilters(!showFilters)
+            if (!showFilters) setDraftFilters(filters)
+          }}>
+            <Filter size={16} /> Filters {activeFilterCount > 0 && <span className="badge badge-primary">{activeFilterCount}</span>}
           </button>
+
           <button className="btn btn-ghost" onClick={handleExportCSV}>
             <Download size={16} /> Export CSV
           </button>
           <button className="btn btn-primary" onClick={() => { setEditData(null); setModalOpen(true) }}>
             <Plus size={16} /> Add
           </button>
+          
+          {showFilters && (
+            <div className="filters-drawer">
+              <div className="filters-grid">
+                <div className="form-group">
+                  <label>From</label>
+                  <input type="date" value={draftFilters.dateFrom}
+                    onChange={e => setDraftFilters(f => ({ ...f, dateFrom: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label>To</label>
+                  <input type="date" value={draftFilters.dateTo}
+                    onChange={e => setDraftFilters(f => ({ ...f, dateTo: e.target.value }))} />
+                </div>
+              </div>
+              
+              <div className="filters-grid" style={{ marginTop: 12 }}>
+                <div className="form-group">
+                  <label>Type</label>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {['income', 'expense'].map(t => (
+                      <label key={t} className="checkbox-label" style={{textTransform: 'capitalize'}}>
+                        <input type="checkbox" checked={draftFilters.types?.includes(t) || false} onChange={e => {
+                          if (e.target.checked) setDraftFilters(f => ({ ...f, types: [...(f.types||[]), t] }))
+                          else setDraftFilters(f => ({ ...f, types: (f.types||[]).filter(x => x !== t) }))
+                        }} /> {t === 'income' ? 'Credit' : 'Debit'}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Payment Method</label>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {PAYMENT_METHODS.filter(pm => pm.value !== 'other').map(pm => (
+                      <label key={pm.value} className="checkbox-label">
+                        <input type="checkbox" checked={draftFilters.methods?.includes(pm.value) || false} onChange={e => {
+                          if (e.target.checked) setDraftFilters(f => ({ ...f, methods: [...(f.methods||[]), pm.value] }))
+                          else setDraftFilters(f => ({ ...f, methods: (f.methods||[]).filter(x => x !== pm.value) }))
+                        }} /> {pm.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: 12 }}>
+                <label>Categories</label>
+                <div className="categories-filter-box" style={{ 
+                  display: 'flex', gap: 8, flexWrap: 'wrap', maxHeight: 120, overflowY: 'auto', padding: '12px 8px',
+                  border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)'
+                 }}>
+                  {CATEGORIES.map(c => {
+                    const isSelected = draftFilters.categories?.includes(c.value);
+                    return (
+                      <label key={c.value} className="badge" style={{
+                        cursor: 'pointer', background: isSelected ? 'var(--color-primary)' : 'transparent',
+                        color: isSelected ? '#fff' : 'var(--color-text)', border: '1px solid var(--color-border)'
+                      }}>
+                        <input type="checkbox" hidden checked={isSelected || false} onChange={e => {
+                          if (e.target.checked) setDraftFilters(f => ({ ...f, categories: [...(f.categories||[]), c.value] }))
+                          else setDraftFilters(f => ({ ...f, categories: (f.categories||[]).filter(x => x !== c.value) }))
+                        }} />
+                        {c.emoji} {c.value}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: 12 }}>
+                <label>Search Notes</label>
+                <div className="search-input-wrapper">
+                  <Search size={16} />
+                  <input type="text" placeholder="Search..." value={draftFilters.search}
+                    onChange={e => setDraftFilters(f => ({ ...f, search: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="form-actions" style={{ marginTop: 16 }}>
+                <button className="btn btn-ghost" onClick={() => {
+                  const resetFilters = { dateFrom: '', dateTo: '', types: [], categories: [], methods: [], search: '', sortBy: 'date_time', sortDir: 'desc' }
+                  setDraftFilters(resetFilters)
+                  setFilters(resetFilters)
+                  setPage(0)
+                  setShowFilters(false)
+                }}>Clear All Filters</button>
+                <button className="btn btn-primary" onClick={() => {
+                   setFilters(draftFilters)
+                   setPage(0)
+                   setShowFilters(false)
+                }}>Apply Filters</button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Filters */}
-      {showFilters && (
-        <div className="card filters-bar">
-          <div className="filters-grid">
-            <div className="form-group">
-              <label>From</label>
-              <input type="date" value={filters.dateFrom}
-                onChange={e => { setFilters(f => ({ ...f, dateFrom: e.target.value })); setPage(0) }} />
-            </div>
-            <div className="form-group">
-              <label>To</label>
-              <input type="date" value={filters.dateTo}
-                onChange={e => { setFilters(f => ({ ...f, dateTo: e.target.value })); setPage(0) }} />
-            </div>
-            <div className="form-group">
-              <label>Type</label>
-              <select value={filters.type}
-                onChange={e => { setFilters(f => ({ ...f, type: e.target.value })); setPage(0) }}>
-                <option value="all">All</option>
-                <option value="income">Income</option>
-                <option value="expense">Expense</option>
-                <option value="transfer">Transfer</option>
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Payment</label>
-              <select value={filters.paymentMethod}
-                onChange={e => { setFilters(f => ({ ...f, paymentMethod: e.target.value })); setPage(0) }}>
-                <option value="all">All</option>
-                {PAYMENT_METHODS.map(pm => <option key={pm.value} value={pm.value}>{pm.label}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label>Search</label>
-              <div className="search-input-wrapper">
-                <Search size={16} />
-                <input type="text" placeholder="Search notes..." value={filters.search}
-                  onChange={e => { setFilters(f => ({ ...f, search: e.target.value })); setPage(0) }} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Sort</label>
-              <div className="sort-controls">
-                <select value={filters.sortBy}
-                  onChange={e => setFilters(f => ({ ...f, sortBy: e.target.value }))}>
-                  <option value="date_time">Date</option>
-                  <option value="amount">Amount</option>
-                </select>
-                <button className="btn btn-sm btn-ghost"
-                  onClick={() => setFilters(f => ({ ...f, sortDir: f.sortDir === 'asc' ? 'desc' : 'asc' }))}>
-                  <ArrowUpDown size={14} />
-                </button>
-              </div>
-            </div>
-          </div>
-          <button className="btn btn-sm btn-ghost" onClick={() => {
-            setFilters({ dateFrom: '', dateTo: '', type: 'all', categories: [], paymentMethod: 'all', search: '', sortBy: 'date_time', sortDir: 'desc' })
+      <div className="time-filter-tabs">
+        {['All', 'This Week', 'This Month'].map(t => (
+          <button key={t} className={timePeriod === t ? 'active' : ''} onClick={() => {
+            setTimePeriod(t)
             setPage(0)
-          }}>Clear Filters</button>
-        </div>
-      )}
+          }}>{t}</button>
+        ))}
+      </div>
 
       {/* Budget Overview */}
       <BudgetOverview budgets={budgets} categorySpending={categorySpending} onSetBudget={handleSetBudget} />
@@ -729,8 +895,13 @@ export default function Transactions() {
           <>
             <div className="tx-table">
               <div className="tx-table-header">
-                <span>Date</span><span>Type</span><span>Category</span>
-                <span>Note</span><span>Method</span><span>Amount</span><span>Actions</span>
+                <span>Date</span>
+                <span>Type</span>
+                <span>Category</span>
+                <span>Note</span>
+                <span>Method</span>
+                <span>Amount</span>
+                <span>Actions</span>
               </div>
               {transactions.map(t => {
                 const PayIcon = getPayIcon(t.payment_method)
@@ -739,7 +910,7 @@ export default function Transactions() {
                     <span className="tx-date">{format(new Date(t.date_time), 'MMM d, HH:mm')}</span>
                     <span><span className="badge" style={{
                       background: TYPE_COLORS[t.type] + '20', color: TYPE_COLORS[t.type]
-                    }}>{t.type}</span></span>
+                    }}>{t.type === 'income' ? 'Credit' : t.type === 'expense' ? 'Debit' : 'Transfer'}</span></span>
                     <span className="tx-category">{getCatEmoji(t.category)} {t.category}</span>
                     <span className="tx-note">{t.note || '—'}</span>
                     <span><span className="badge badge-sm"><PayIcon size={12} /> {t.payment_method}</span></span>
