@@ -881,9 +881,6 @@ export default function Transactions() {
         ))}
       </div>
 
-      {/* Budget Overview */}
-      <BudgetOverview budgets={budgets} categorySpending={categorySpending} onSetBudget={handleSetBudget} />
-
       {/* Transaction List */}
       <div className="card">
         {loading ? (
