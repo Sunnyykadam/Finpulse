@@ -708,12 +708,6 @@ export default function Transactions() {
   return (
     <div className="page-container">
       <style>{`
-        .tx-table-header, .tx-table-row {
-          display: grid;
-          grid-template-columns: 1.2fr 0.8fr 1.5fr 2fr 1fr 1fr 1fr;
-          gap: 16px;
-          align-items: center;
-        }
         .filters-drawer {
           background: var(--color-card);
           position: absolute;
@@ -726,6 +720,8 @@ export default function Transactions() {
           border-radius: var(--radius-card);
           padding: 20px;
           margin-top: 8px;
+          max-height: 80vh;
+          overflow-y: auto;
         }
         .header-actions-wrapper {
           position: relative;
@@ -890,7 +886,8 @@ export default function Transactions() {
             action={() => { setEditData(null); setModalOpen(true) }} actionLabel="Add Transaction" />
         ) : (
           <>
-            <div className="tx-table">
+            {/* Desktop Table */}
+            <div className="tx-table tx-table-desktop">
               <div className="tx-table-header">
                 <span>Date</span>
                 <span>Type</span>
@@ -915,11 +912,43 @@ export default function Transactions() {
                       {t.type === 'income' ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}
                     </span>
                     <span className="tx-actions">
-                      <button className="icon-btn" onClick={() => { setEditData(t); setModalOpen(true) }}
-                        title="Edit"><Edit2 size={15} /></button>
-                      <button className="icon-btn danger" onClick={() => setDeleteConfirm(t.id)}
-                        title="Delete"><Trash2 size={15} /></button>
+                      <button className="icon-btn" onClick={() => { setEditData(t); setModalOpen(true) }} title="Edit"><Edit2 size={15} /></button>
+                      <button className="icon-btn danger" onClick={() => setDeleteConfirm(t.id)} title="Delete"><Trash2 size={15} /></button>
                     </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="tx-cards-mobile">
+              {transactions.map(t => {
+                const PayIcon = getPayIcon(t.payment_method)
+                const isCredit = t.type === 'income'
+                return (
+                  <div key={`m-${t.id}`} className="tx-card">
+                    <div className="tx-card-top">
+                      <div className="tx-card-category">
+                        <span className="tx-card-emoji">{getCatEmoji(t.category)}</span>
+                        <span className="tx-card-cat-name">{t.category}</span>
+                      </div>
+                      <span className={`tx-card-amount ${isCredit ? 'income' : 'expense'}`}>
+                        {isCredit ? '+' : '-'}₹{Number(t.amount).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="tx-card-details">
+                      <span className="tx-card-detail"><strong>Date:</strong> {format(new Date(t.date_time), 'MMM d, yyyy · HH:mm')}</span>
+                      <span className="tx-card-detail"><strong>Method:</strong> <span className="badge badge-sm"><PayIcon size={11} /> {t.payment_method}</span></span>
+                      {t.note && <span className="tx-card-detail"><strong>Note:</strong> {t.note}</span>}
+                    </div>
+                    <div className="tx-card-actions">
+                      <button className="btn btn-sm btn-ghost" onClick={() => { setEditData(t); setModalOpen(true) }}>
+                        <Edit2 size={14} /> Edit
+                      </button>
+                      <button className="btn btn-sm btn-danger" onClick={() => setDeleteConfirm(t.id)}>
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </div>
                   </div>
                 )
               })}
