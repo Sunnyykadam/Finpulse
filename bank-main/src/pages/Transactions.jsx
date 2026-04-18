@@ -19,7 +19,6 @@ import { format } from 'date-fns'
 // Helper: determine which balance a payment method affects
 const getBalanceKey = (method) => {
   if (method === 'cash') return 'cash_balance'
-  // bank, upi, card all deduct from bank balance
   return 'bank_balance'
 }
 
@@ -40,6 +39,35 @@ const PAYMENT_METHODS = [
 ]
 
 const TYPE_COLORS = { income: '#22C55E', expense: '#EF4444', transfer: '#4F46E5' }
+
+// ─── Shared chip style helper ───────────────────────────────────────────────
+const chipStyle = (selected, variant = 'purple') => {
+  const variants = {
+    purple: { border: '#7C3AED', bg: 'rgba(124,58,237,0.18)', color: '#fff' },
+    green: { border: '#16A34A', bg: 'rgba(22,163,74,0.18)', color: '#fff' },
+    red: { border: '#DC2626', bg: 'rgba(220,38,38,0.18)', color: '#fff' },
+  }
+  const v = variants[variant]
+  return selected
+    ? {
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '6px 14px', borderRadius: 10,
+      border: `1.5px solid ${v.border}`,
+      background: v.bg, color: v.color,
+      fontSize: '0.85rem', fontWeight: 600,
+      cursor: 'pointer', transition: 'all 0.15s',
+      outline: 'none', userSelect: 'none'
+    }
+    : {
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '6px 14px', borderRadius: 10,
+      border: '1.5px solid rgba(255,255,255,0.10)',
+      background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)',
+      fontSize: '0.85rem', fontWeight: 500,
+      cursor: 'pointer', transition: 'all 0.15s',
+      outline: 'none', userSelect: 'none'
+    }
+}
 
 function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cashBalance = 0, bankBalance = 0 }) {
   const [form, setForm] = useState({
@@ -112,7 +140,6 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
       }
     }
 
-    // --- Insufficient balance check for expenses ---
     if (form.type === 'expense' && !editData) {
       const amount = Number(form.amount)
       if (form.is_split) {
@@ -142,9 +169,11 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
       type: form.type,
       amount: Number(form.amount),
       payment_method: form.is_split ? 'cash' : form.payment_method,
-      category: form.category === 'Custom...' ? (form.customCategoryName || 'Custom') : form.category,
+      category: form.category === 'Custom...' ? 'Other' : form.category,
       linked_goal_id: form.linked_goal_id || null,
-      note: form.note,
+      note: form.category === 'Custom...' && form.customCategoryName 
+        ? `[${form.customCategoryName.trim()}] ${form.note}`.trim() 
+        : form.note,
       is_split: form.is_split,
       split_cash_amount: form.is_split ? Number(form.split_cash_amount || 0) : null,
       split_bank_amount: form.is_split ? Number(form.split_bank_amount || 0) : null,
@@ -160,28 +189,50 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
         .tx-form input[type="number"]::-webkit-inner-spin-button,
         .tx-form input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .tx-form input[type="number"] { -moz-appearance: textfield; }
+        .tx-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tx-chip-row button { font-family: inherit; }
+        .tx-section-label {
+          display: block;
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.07em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.35);
+          margin-bottom: 8px;
+        }
       `}</style>
       <form onSubmit={handleSubmit} className="tx-form">
+
+        {/* Date & Time */}
         <div className="form-group">
-          <label>Date & Time</label>
+          <label>Date &amp; Time</label>
           <input type="datetime-local" value={form.date_time}
             onChange={e => setForm(f => ({ ...f, date_time: e.target.value }))} />
         </div>
 
+        {/* Type */}
         <div className="form-group">
-          <label>Type</label>
-          <div className="type-toggle">
-            {['income', 'expense'].map(t => (
-              <button key={t} type="button"
-                className={`type-btn ${form.type === t ? 'active' : ''}`}
-                style={form.type === t ? { background: t === 'income' ? '#3B82F6' : '#EF4444', color: '#fff' } : {}}
-                onClick={() => setForm(f => ({ ...f, type: t }))}>
-                {t === 'income' ? 'Credit' : 'Debit'}
-              </button>
-            ))}
+          <span className="tx-section-label">Type</span>
+          <div className="tx-chip-row">
+            {['income', 'expense'].map(t => {
+              const selected = form.type === t
+              const variant = t === 'income' ? 'green' : 'red'
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  style={chipStyle(selected, variant)}
+                  onClick={() => setForm(f => ({ ...f, type: t }))}
+                >
+                  {selected && <span style={{ fontSize: '0.9em' }}>✓</span>}
+                  <span>{t === 'income' ? '↑ Credit' : '↓ Debit'}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
 
+        {/* Amount */}
         <div className="form-group">
           <label>Amount (₹)</label>
           <div className="amount-input-wrapper">
@@ -191,20 +242,30 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
           </div>
         </div>
 
+        {/* Payment Method */}
         <div className="form-group">
-          <label>Payment Method</label>
-          <div className="payment-selector">
-            {PAYMENT_METHODS.map(pm => (
-              <button key={pm.value} type="button"
-                className={`payment-btn ${form.payment_method === pm.value && !form.is_split ? 'active' : ''}`}
-                onClick={() => setForm(f => ({ ...f, payment_method: pm.value, is_split: false }))}>
-                <pm.icon size={16} />
-                <span>{pm.label}</span>
-              </button>
-            ))}
+          <span className="tx-section-label">Payment Method</span>
+          <div className="tx-chip-row">
+            {PAYMENT_METHODS.map(pm => {
+              const selected = form.payment_method === pm.value && !form.is_split
+              return (
+                <button
+                  key={pm.value}
+                  type="button"
+                  style={chipStyle(selected, 'purple')}
+                  onClick={() => setForm(f => ({ ...f, payment_method: pm.value, is_split: false }))}
+                >
+                  {selected && <span style={{ fontSize: '0.9em' }}>✓</span>}
+                  <pm.icon size={14} />
+                  <span>{pm.label}</span>
+                </button>
+              )
+            })}
           </div>
+
+          {/* Balance hint */}
           {form.type === 'expense' && !form.is_split && (
-            <div className="balance-hint" style={{
+            <div style={{
               marginTop: 8, padding: '6px 12px', borderRadius: 8, fontSize: '0.82rem', fontWeight: 500,
               background: (Number(form.amount || 0) > (getBalanceKey(form.payment_method) === 'cash_balance' ? cashBalance : bankBalance))
                 ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
@@ -219,18 +280,16 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
           )}
           {form.type === 'expense' && form.is_split && (
             <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <div className="balance-hint" style={{
+              <div style={{
                 padding: '6px 12px', borderRadius: 8, fontSize: '0.82rem', fontWeight: 500, flex: 1,
-                background: (Number(form.split_cash_amount || 0) > cashBalance)
-                  ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
+                background: (Number(form.split_cash_amount || 0) > cashBalance) ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
                 color: (Number(form.split_cash_amount || 0) > cashBalance) ? '#EF4444' : '#22C55E'
               }}>
                 💵 Cash: ₹{cashBalance.toLocaleString('en-IN')}
               </div>
-              <div className="balance-hint" style={{
+              <div style={{
                 padding: '6px 12px', borderRadius: 8, fontSize: '0.82rem', fontWeight: 500, flex: 1,
-                background: (Number(form.split_bank_amount || 0) > bankBalance)
-                  ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
+                background: (Number(form.split_bank_amount || 0) > bankBalance) ? 'rgba(239, 68, 68, 0.12)' : 'rgba(34, 197, 94, 0.10)',
                 color: (Number(form.split_bank_amount || 0) > bankBalance) ? '#EF4444' : '#22C55E'
               }}>
                 🏦 Bank: ₹{bankBalance.toLocaleString('en-IN')}
@@ -239,6 +298,7 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
           )}
         </div>
 
+        {/* Split Transaction */}
         <div className="form-group">
           <label className="switch-label">
             <span>Split Transaction</span>
@@ -264,23 +324,47 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
           )}
         </div>
 
+        {/* Category */}
         <div className="form-group">
-          <label>Category</label>
-          <select value={form.category}
-            onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-            {CATEGORIES.filter(c => c.value !== 'Other').map(c => (
-              <option key={c.value} value={c.value}>{c.emoji} {c.value}</option>
-            ))}
-            <option value="Custom...">➕ Custom...</option>
-          </select>
+          <span className="tx-section-label">Category</span>
+          <div className="tx-chip-row">
+            {CATEGORIES.filter(c => c.value !== 'Other').map(c => {
+              const selected = form.category === c.value
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  style={chipStyle(selected, 'purple')}
+                  onClick={() => setForm(f => ({ ...f, category: c.value }))}
+                >
+                  <span>{c.emoji}</span>
+                  <span>{c.value}</span>
+                  {selected && <span style={{ fontSize: '0.85em', marginLeft: 2 }}>✓</span>}
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              style={chipStyle(form.category === 'Custom...', 'purple')}
+              onClick={() => setForm(f => ({ ...f, category: 'Custom...' }))}
+            >
+              <span>➕</span>
+              <span>Custom...</span>
+              {form.category === 'Custom...' && <span style={{ fontSize: '0.85em', marginLeft: 2 }}>✓</span>}
+            </button>
+          </div>
           {form.category === 'Custom...' && (
-            <input type="text" placeholder="Enter custom category name" style={{marginTop: 8}}
+            <input
+              type="text"
+              placeholder="Enter custom category name"
+              style={{ marginTop: 8 }}
               value={form.customCategoryName || ''}
-              onChange={e => setForm(f => ({...f, customCategoryName: e.target.value}))}
+              onChange={e => setForm(f => ({ ...f, customCategoryName: e.target.value }))}
             />
           )}
         </div>
 
+        {/* Link to Goal */}
         {goals.length > 0 && (
           <div className="form-group">
             <label>Link to Goal (optional)</label>
@@ -294,12 +378,14 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
           </div>
         )}
 
+        {/* Note */}
         <div className="form-group">
           <label>Note</label>
           <input type="text" placeholder="Add a note..." value={form.note}
             onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
         </div>
 
+        {/* Receipt */}
         <div className="form-group">
           <label>Receipt (optional)</label>
           <div className="upload-area">
@@ -312,10 +398,22 @@ function TransactionModal({ isOpen, onClose, onSubmit, editData, goals = [], cas
           </div>
         </div>
 
+        {/* Actions */}
         <div className="form-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary">
-            {editData ? 'Update' : 'Add Transaction'}
+          <button
+            type="submit"
+            style={{
+              flex: 1, padding: '12px 20px', borderRadius: 12,
+              background: 'linear-gradient(135deg, #7C3AED, #6D28D9)',
+              color: '#fff', fontWeight: 700, fontSize: '0.95rem',
+              border: 'none', cursor: 'pointer', transition: 'opacity 0.15s',
+              letterSpacing: '0.02em'
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = '0.88'}
+            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+          >
+            {editData ? '✓ Update Transaction' : '+ Add Transaction'}
           </button>
         </div>
       </form>
@@ -404,7 +502,6 @@ export default function Transactions() {
   const [showFilters, setShowFilters] = useState(false)
   const PAGE_SIZE = 20
 
-  // Auto-open modal when navigated from FAB
   useEffect(() => {
     if (searchParams.get('addNew') === 'true') {
       setEditData(null)
@@ -430,37 +527,37 @@ export default function Transactions() {
     setLoading(true)
     try {
       let query = supabase.from('transactions').select('*', { count: 'exact' }).eq('user_id', user.id)
-      
+
       let finalDateFrom = filters.dateFrom
       let finalDateTo = filters.dateTo
-      
+
       if (!finalDateFrom && !finalDateTo && timePeriod !== 'All') {
-         if (timePeriod === 'This Week') {
-            const d = new Date()
-            const day = d.getDay()
-            const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-            const start = new Date(d.setDate(diff))
-            start.setHours(0,0,0,0)
-            const end = new Date(start)
-            end.setDate(end.getDate() + 6)
-            end.setHours(23,59,59,999)
-            finalDateFrom = start.toISOString()
-            finalDateTo = end.toISOString()
-         } else if (timePeriod === 'This Month') {
-            const d = new Date()
-            const start = new Date(d.getFullYear(), d.getMonth(), 1)
-            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
-            finalDateFrom = start.toISOString()
-            finalDateTo = end.toISOString()
-         }
+        if (timePeriod === 'This Week') {
+          const d = new Date()
+          const day = d.getDay()
+          const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+          const start = new Date(d.setDate(diff))
+          start.setHours(0, 0, 0, 0)
+          const end = new Date(start)
+          end.setDate(end.getDate() + 6)
+          end.setHours(23, 59, 59, 999)
+          finalDateFrom = start.toISOString()
+          finalDateTo = end.toISOString()
+        } else if (timePeriod === 'This Month') {
+          const d = new Date()
+          const start = new Date(d.getFullYear(), d.getMonth(), 1)
+          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+          finalDateFrom = start.toISOString()
+          finalDateTo = end.toISOString()
+        }
       } else {
-         if (finalDateFrom) finalDateFrom = new Date(finalDateFrom).toISOString()
-         if (finalDateTo) finalDateTo = new Date(finalDateTo + 'T23:59:59').toISOString()
+        if (finalDateFrom) finalDateFrom = new Date(finalDateFrom).toISOString()
+        if (finalDateTo) finalDateTo = new Date(finalDateTo + 'T23:59:59').toISOString()
       }
 
       if (finalDateFrom) query = query.gte('date_time', finalDateFrom)
       if (finalDateTo) query = query.lte('date_time', finalDateTo)
-      
+
       if (filters.types?.length > 0) query = query.in('type', filters.types)
       if (filters.categories?.length > 0) query = query.in('category', filters.categories)
       if (filters.methods?.length > 0) query = query.in('payment_method', filters.methods)
@@ -507,12 +604,10 @@ export default function Transactions() {
 
   const handleSubmit = async (payload, editId) => {
     if (editId) {
-      // --- Reverse old transaction's balance impact, then apply new ---
       const oldTx = transactions.find(t => t.id === editId)
       const { error } = await supabase.from('transactions').update(payload).eq('id', editId).eq('user_id', user.id)
       if (error) { toast.error('Update failed'); return }
 
-      // Reverse old balance impact
       if (oldTx && profile) {
         let balUpdate = {}
         if (oldTx.is_split) {
@@ -534,7 +629,6 @@ export default function Transactions() {
           }
         }
 
-        // Apply new transaction's impact on top of reversed balance
         if (payload.is_split) {
           const newCash = Number(payload.split_cash_amount || 0)
           const newBank = Number(payload.split_bank_amount || 0)
@@ -565,7 +659,6 @@ export default function Transactions() {
       const { error } = await supabase.from('transactions').insert([{ ...payload, user_id: user.id }])
       if (error) { toast.error('Add failed'); return }
 
-      // --- Auto-update balance on new transaction ---
       if (profile) {
         let balUpdate = {}
         if (payload.is_split) {
@@ -600,12 +693,10 @@ export default function Transactions() {
   }
 
   const handleDelete = async (id) => {
-    // Find the transaction to reverse its balance impact
     const tx = transactions.find(t => t.id === id)
     const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id)
     if (error) { toast.error('Delete failed'); return }
 
-    // Reverse balance impact on delete
     if (tx && profile) {
       let balUpdate = {}
       if (tx.is_split) {
@@ -653,27 +744,27 @@ export default function Transactions() {
     let finalDateFrom = filters.dateFrom
     let finalDateTo = filters.dateTo
     if (!finalDateFrom && !finalDateTo && timePeriod !== 'All') {
-       if (timePeriod === 'This Week') {
-          const d = new Date()
-          const day = d.getDay()
-          const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-          const start = new Date(d.setDate(diff))
-          start.setHours(0,0,0,0)
-          const end = new Date(start)
-          end.setDate(end.getDate() + 6)
-          end.setHours(23,59,59,999)
-          finalDateFrom = start.toISOString()
-          finalDateTo = end.toISOString()
-       } else if (timePeriod === 'This Month') {
-          const d = new Date()
-          const start = new Date(d.getFullYear(), d.getMonth(), 1)
-          const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
-          finalDateFrom = start.toISOString()
-          finalDateTo = end.toISOString()
-       }
+      if (timePeriod === 'This Week') {
+        const d = new Date()
+        const day = d.getDay()
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+        const start = new Date(d.setDate(diff))
+        start.setHours(0, 0, 0, 0)
+        const end = new Date(start)
+        end.setDate(end.getDate() + 6)
+        end.setHours(23, 59, 59, 999)
+        finalDateFrom = start.toISOString()
+        finalDateTo = end.toISOString()
+      } else if (timePeriod === 'This Month') {
+        const d = new Date()
+        const start = new Date(d.getFullYear(), d.getMonth(), 1)
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999)
+        finalDateFrom = start.toISOString()
+        finalDateTo = end.toISOString()
+      }
     } else {
-       if (finalDateFrom) finalDateFrom = new Date(finalDateFrom).toISOString()
-       if (finalDateTo) finalDateTo = new Date(finalDateTo + 'T23:59:59').toISOString()
+      if (finalDateFrom) finalDateFrom = new Date(finalDateFrom).toISOString()
+      if (finalDateTo) finalDateTo = new Date(finalDateTo + 'T23:59:59').toISOString()
     }
     if (finalDateFrom) query = query.gte('date_time', finalDateFrom)
     if (finalDateTo) query = query.lte('date_time', finalDateTo)
@@ -691,7 +782,6 @@ export default function Transactions() {
   }
 
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
-
   const getCatEmoji = (cat) => CATEGORIES.find(c => c.value === cat)?.emoji || '📋'
   const getPayIcon = (method) => {
     const m = PAYMENT_METHODS.find(p => p.value === method)
@@ -770,7 +860,7 @@ export default function Transactions() {
           <button className="btn btn-primary" onClick={() => { setEditData(null); setModalOpen(true) }}>
             <Plus size={16} /> Add
           </button>
-          
+
           {showFilters && (
             <div className="filters-drawer">
               <div className="filters-grid">
@@ -785,16 +875,16 @@ export default function Transactions() {
                     onChange={e => setDraftFilters(f => ({ ...f, dateTo: e.target.value }))} />
                 </div>
               </div>
-              
+
               <div className="filters-grid" style={{ marginTop: 12 }}>
                 <div className="form-group">
                   <label>Type</label>
                   <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                     {['income', 'expense'].map(t => (
-                      <label key={t} className="checkbox-label" style={{textTransform: 'capitalize'}}>
+                      <label key={t} className="checkbox-label" style={{ textTransform: 'capitalize' }}>
                         <input type="checkbox" checked={draftFilters.types?.includes(t) || false} onChange={e => {
-                          if (e.target.checked) setDraftFilters(f => ({ ...f, types: [...(f.types||[]), t] }))
-                          else setDraftFilters(f => ({ ...f, types: (f.types||[]).filter(x => x !== t) }))
+                          if (e.target.checked) setDraftFilters(f => ({ ...f, types: [...(f.types || []), t] }))
+                          else setDraftFilters(f => ({ ...f, types: (f.types || []).filter(x => x !== t) }))
                         }} /> {t === 'income' ? 'Credit' : 'Debit'}
                       </label>
                     ))}
@@ -807,8 +897,8 @@ export default function Transactions() {
                     {PAYMENT_METHODS.filter(pm => pm.value !== 'other').map(pm => (
                       <label key={pm.value} className="checkbox-label">
                         <input type="checkbox" checked={draftFilters.methods?.includes(pm.value) || false} onChange={e => {
-                          if (e.target.checked) setDraftFilters(f => ({ ...f, methods: [...(f.methods||[]), pm.value] }))
-                          else setDraftFilters(f => ({ ...f, methods: (f.methods||[]).filter(x => x !== pm.value) }))
+                          if (e.target.checked) setDraftFilters(f => ({ ...f, methods: [...(f.methods || []), pm.value] }))
+                          else setDraftFilters(f => ({ ...f, methods: (f.methods || []).filter(x => x !== pm.value) }))
                         }} /> {pm.label}
                       </label>
                     ))}
@@ -818,10 +908,10 @@ export default function Transactions() {
 
               <div className="form-group" style={{ marginTop: 12 }}>
                 <label>Categories</label>
-                <div className="categories-filter-box" style={{ 
+                <div style={{
                   display: 'flex', gap: 8, flexWrap: 'wrap', maxHeight: 120, overflowY: 'auto', padding: '12px 8px',
                   border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)'
-                 }}>
+                }}>
                   {CATEGORIES.map(c => {
                     const isSelected = draftFilters.categories?.includes(c.value);
                     return (
@@ -830,8 +920,8 @@ export default function Transactions() {
                         color: isSelected ? '#fff' : 'var(--color-text)', border: '1px solid var(--color-border)'
                       }}>
                         <input type="checkbox" hidden checked={isSelected || false} onChange={e => {
-                          if (e.target.checked) setDraftFilters(f => ({ ...f, categories: [...(f.categories||[]), c.value] }))
-                          else setDraftFilters(f => ({ ...f, categories: (f.categories||[]).filter(x => x !== c.value) }))
+                          if (e.target.checked) setDraftFilters(f => ({ ...f, categories: [...(f.categories || []), c.value] }))
+                          else setDraftFilters(f => ({ ...f, categories: (f.categories || []).filter(x => x !== c.value) }))
                         }} />
                         {c.emoji} {c.value}
                       </label>
@@ -858,9 +948,9 @@ export default function Transactions() {
                   setShowFilters(false)
                 }}>Clear All Filters</button>
                 <button className="btn btn-primary" onClick={() => {
-                   setFilters(draftFilters)
-                   setPage(0)
-                   setShowFilters(false)
+                  setFilters(draftFilters)
+                  setPage(0)
+                  setShowFilters(false)
                 }}>Apply Filters</button>
               </div>
             </div>
@@ -877,16 +967,14 @@ export default function Transactions() {
         ))}
       </div>
 
-      {/* Transaction List */}
       <div className="card">
         {loading ? (
-          <div>{[1,2,3,4,5,6,7,8].map(i => <SkeletonRow key={i} />)}</div>
+          <div>{[1, 2, 3, 4, 5, 6, 7, 8].map(i => <SkeletonRow key={i} />)}</div>
         ) : transactions.length === 0 ? (
           <EmptyState title="No transactions found" description="Try adjusting filters or add your first transaction."
             action={() => { setEditData(null); setModalOpen(true) }} actionLabel="Add Transaction" />
         ) : (
           <>
-            {/* Desktop Table */}
             <div className="tx-table tx-table-desktop">
               <div className="tx-table-header">
                 <span>Date</span>
@@ -920,7 +1008,6 @@ export default function Transactions() {
               })}
             </div>
 
-            {/* Mobile Cards */}
             <div className="tx-cards-mobile">
               {transactions.map(t => {
                 const PayIcon = getPayIcon(t.payment_method)
@@ -954,7 +1041,6 @@ export default function Transactions() {
               })}
             </div>
 
-            {/* Pagination */}
             <div className="pagination">
               <button className="btn btn-sm btn-ghost" disabled={page === 0}
                 onClick={() => setPage(p => p - 1)}>
@@ -972,7 +1058,6 @@ export default function Transactions() {
         )}
       </div>
 
-      {/* Transaction Modal */}
       <TransactionModal
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setEditData(null) }}
@@ -983,7 +1068,6 @@ export default function Transactions() {
         bankBalance={profile?.bank_balance || 0}
       />
 
-      {/* Delete Confirmation */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal-content modal-sm" onClick={e => e.stopPropagation()}>
