@@ -561,7 +561,14 @@ export default function Transactions() {
       if (filters.types?.length > 0) query = query.in('type', filters.types)
       if (filters.categories?.length > 0) query = query.in('category', filters.categories)
       if (filters.methods?.length > 0) query = query.in('payment_method', filters.methods)
-      if (filters.search) query = query.ilike('note', `%${filters.search}%`)
+      if (filters.search) {
+        const searchAmount = Number(filters.search)
+        if (!isNaN(searchAmount) && searchAmount > 0) {
+          query = query.or(`note.ilike.%${filters.search}%,amount.eq.${searchAmount}`)
+        } else {
+          query = query.ilike('note', `%${filters.search}%`)
+        }
+      }
       query = query.order(filters.sortBy, { ascending: filters.sortDir === 'asc' })
       query = query.range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
       const { data, count, error } = await query
@@ -958,13 +965,71 @@ export default function Transactions() {
         </div>
       </div>
 
-      <div className="time-filter-tabs">
-        {['All', 'This Week', 'This Month'].map(t => (
-          <button key={t} className={timePeriod === t ? 'active' : ''} onClick={() => {
-            setTimePeriod(t)
-            setPage(0)
-          }}>{t}</button>
-        ))}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
+        <div className="time-filter-tabs" style={{ marginBottom: 0 }}>
+          {['All', 'This Week', 'This Month'].map(t => (
+            <button key={t} className={timePeriod === t ? 'active' : ''} onClick={() => {
+              setTimePeriod(t)
+              setPage(0)
+            }}>{t}</button>
+          ))}
+        </div>
+        
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Date Range:</span>
+          <input type="date" value={filters.dateFrom} 
+            onChange={e => { setFilters(f => ({ ...f, dateFrom: e.target.value })); setPage(0); }} 
+            className="filter-date-input" style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--color-text)', outline: 'none' }} />
+          <span style={{ color: 'var(--color-text-secondary)' }}>to</span>
+          <input type="date" value={filters.dateTo} 
+            onChange={e => { setFilters(f => ({ ...f, dateTo: e.target.value })); setPage(0); }} 
+            className="filter-date-input" style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: '6px', padding: '6px 8px', color: 'var(--color-text)', outline: 'none' }} />
+        </div>
+      </div>
+
+      {/* Real-time Filters Bar */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', marginBottom: '16px' }}>
+        <div className="search-input-wrapper" style={{ flex: 1, minWidth: '200px', background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: '8px', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
+          <Search size={16} color="var(--color-text-secondary)" />
+          <input type="text" placeholder="Search by note or amount..." 
+            value={filters.search} 
+            onChange={e => { setFilters(f => ({ ...f, search: e.target.value })); setPage(0); }} 
+            style={{ border: 'none', background: 'transparent', outline: 'none', color: 'var(--color-text)', padding: '10px 8px', width: '100%', fontSize: '0.9rem' }} />
+        </div>
+
+        <select 
+          value={filters.categories?.length === 1 ? filters.categories[0] : ''} 
+          onChange={e => {
+             const val = e.target.value;
+             setFilters(f => ({ ...f, categories: val ? [val] : [] })); 
+             setPage(0);
+          }}
+          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', cursor: 'pointer', fontSize: '0.9rem' }}>
+          <option value="">All Categories</option>
+          {Array.from(new Set([...CATEGORIES.map(c=>c.value), ...transactions.map(t=>t.category)])).map(cat => (
+             <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
+
+        <select 
+          value={filters.methods?.length === 1 ? filters.methods[0] : ''} 
+          onChange={e => {
+             const val = e.target.value;
+             setFilters(f => ({ ...f, methods: val ? [val] : [] })); 
+             setPage(0);
+          }}
+          style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '10px 12px', color: 'var(--color-text)', outline: 'none', cursor: 'pointer', fontSize: '0.9rem', textTransform: 'capitalize' }}>
+          <option value="">All Methods</option>
+          {Array.from(new Set([...PAYMENT_METHODS.filter(pm=>pm.value!=='other').map(pm=>pm.value), ...transactions.map(t=>t.payment_method)])).map(method => (
+             <option key={method} value={method} style={{ textTransform: 'capitalize' }}>{method}</option>
+          ))}
+        </select>
+        
+        <button className="btn btn-ghost" onClick={() => {
+          setFilters({ dateFrom: '', dateTo: '', types: [], categories: [], methods: [], search: '', sortBy: 'date_time', sortDir: 'desc' });
+          setTimePeriod('All');
+          setPage(0);
+        }}>Clear Filters</button>
       </div>
 
       <div className="card">
@@ -988,7 +1053,7 @@ export default function Transactions() {
               {transactions.map(t => {
                 const PayIcon = getPayIcon(t.payment_method)
                 return (
-                  <div key={t.id} className="tx-table-row">
+                  <div key={t.id} className={`tx-table-row ${t.type === 'income' ? 'income-row' : 'expense-row'}`}>
                     <span className="tx-date">{format(new Date(t.date_time), 'MMM d, HH:mm')}</span>
                     <span><span className="badge" style={{
                       background: TYPE_COLORS[t.type] + '20', color: TYPE_COLORS[t.type]
@@ -1013,7 +1078,7 @@ export default function Transactions() {
                 const PayIcon = getPayIcon(t.payment_method)
                 const isCredit = t.type === 'income'
                 return (
-                  <div key={`m-${t.id}`} className="tx-card">
+                  <div key={`m-${t.id}`} className={`tx-card ${isCredit ? 'income-card' : 'expense-card'}`}>
                     <div className="tx-card-top">
                       <div className="tx-card-category">
                         <span className="tx-card-emoji">{getCatEmoji(t.category)}</span>
