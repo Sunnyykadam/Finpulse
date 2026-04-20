@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import {
-  LayoutDashboard, ArrowLeftRight, Target, BarChart3, User
+  LayoutDashboard, ArrowLeftRight, Target, BarChart3, User, HandCoins
 } from 'lucide-react'
 
 const navItems = [
   { path: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { path: '/transactions', label: 'Txns', icon: ArrowLeftRight },
+  { path: '/loans', label: 'Loans', icon: HandCoins },
   { path: '/goals', label: 'Goals', icon: Target },
   { path: '/analytics', label: 'Stats', icon: BarChart3 },
   { path: '/profile', label: 'Profile', icon: User }

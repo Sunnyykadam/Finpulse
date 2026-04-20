@@ -36,12 +36,12 @@ export default function Dashboard() {
   if (loading) return <DashboardSkeleton />;
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1280px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+      <div className="stack-mobile">
         <div>
-          <h1 style={{ fontSize: '18px', fontWeight: '600', margin: 0 }}>Dashboard</h1>
-          <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginTop: '4px' }}>
+          <h1 style={{ margin: 0 }}>Dashboard</h1>
+          <p className="header-date">
             {getGreeting()}, {profile?.name || 'User'}
           </p>
         </div>
@@ -65,20 +65,22 @@ export default function Dashboard() {
 
       {/* Charts Row */}
       <div className="dashboard-grid-2">
-        <div style={{ flex: '5' }}>
+        <div style={{ flex: '1 1 300px' }}>
           <ExpensePieChart categories={expenseCategories} totalExpenses={monthlyExpenses} />
         </div>
-        <div style={{ flex: '7' }}>
+        <div style={{ flex: '1 1 400px' }}>
           <SpendingTrendChart trend={spendingTrend} />
         </div>
       </div>
 
       {/* Data Row */}
       <div className="dashboard-grid-7-5">
-        <div style={{ flex: '7' }}>
-          <RecentTransactions transactions={recentTransactions} />
+        <div style={{ flex: '1 1 min(100%, 700px)', minWidth: 0 }}>
+          <div className="table-responsive">
+            <RecentTransactions transactions={recentTransactions} />
+          </div>
         </div>
-        <div style={{ flex: '5', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ flex: '1 1 300px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <ActiveLoansSummary loansGiven={loansGiven} loansTaken={loansTaken} />
           <SavingsGoalsOverview goals={savingsGoals} />
         </div>
@@ -90,18 +92,16 @@ export default function Dashboard() {
           isOpen={isTxModalOpen} 
           onClose={() => setIsTxModalOpen(false)} 
           onSuccess={refetch} 
+          cashBalance={cashBalance}
+          bankBalance={bankBalance}
         />
       )}
 
       <style>{`
         .dashboard-grid-2, .dashboard-grid-7-5 {
           display: flex;
+          flex-wrap: wrap;
           gap: 16px;
-        }
-        @media (max-width: 768px) {
-          .dashboard-grid-2, .dashboard-grid-7-5 {
-            flex-direction: column;
-          }
         }
       `}</style>
     </div>
@@ -110,28 +110,22 @@ export default function Dashboard() {
 
 function DashboardSkeleton() {
   return (
-    <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '1280px', margin: '0 auto' }}>
-      <div style={{ height: '40px', width: '200px', background: 'var(--color-background-secondary)', borderRadius: '8px' }} className="pulse" />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-        {[1, 2, 3].map(i => <div key={i} style={{ height: '48px', background: 'var(--color-background-secondary)', borderRadius: '10px' }} className="pulse" />)}
+    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ height: '40px', width: '200px', background: 'var(--color-muted)', borderRadius: '8px' }} className="pulse" />
+      <div className="grid-responsive" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        {[1, 2, 3].map(i => <div key={i} style={{ height: '48px', background: 'var(--color-muted)', borderRadius: '10px' }} className="pulse" />)}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-        {[1, 2, 3].map(i => <div key={i} style={{ height: '100px', background: 'var(--color-background-secondary)', borderRadius: '10px' }} className="pulse" />)}
+      <div className="grid-responsive" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        {[1, 2, 3].map(i => <div key={i} style={{ height: '100px', background: 'var(--color-muted)', borderRadius: '10px' }} className="pulse" />)}
       </div>
-      <div style={{ height: '140px', background: 'var(--color-background-secondary)', borderRadius: '10px' }} className="pulse" />
-      <div style={{ display: 'flex', gap: '16px' }}>
-        <div style={{ flex: 5, height: '300px', background: 'var(--color-background-secondary)', borderRadius: '10px' }} className="pulse" />
-        <div style={{ flex: 7, height: '300px', background: 'var(--color-background-secondary)', borderRadius: '10px' }} className="pulse" />
+      <div style={{ height: '140px', background: 'var(--color-muted)', borderRadius: '10px' }} className="pulse" />
+      <div className="dashboard-grid-2">
+        <div style={{ flex: 1, height: '300px', background: 'var(--color-muted)', borderRadius: '10px' }} className="pulse" />
+        <div style={{ flex: 1, height: '300px', background: 'var(--color-muted)', borderRadius: '10px' }} className="pulse" />
       </div>
       <style>{`
-        .pulse {
-          animation: pulse 1.5s ease-in-out infinite;
-        }
-        @keyframes pulse {
-          0% { opacity: 1; }
-          50% { opacity: 0.4; }
-          100% { opacity: 1; }
-        }
+        .pulse { animation: pulse 1.5s ease-in-out infinite; opacity: 0.5; }
+        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.2; } }
       `}</style>
     </div>
   );

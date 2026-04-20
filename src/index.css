@@ -63,6 +63,7 @@ body {
   line-height: 1.6;
   transition: background var(--transition), color var(--transition);
   overflow-x: hidden;
+  width: 100%;
 }
 
 a { color: var(--color-primary); text-decoration: none; transition: color var(--transition); }
@@ -79,10 +80,10 @@ a:hover { color: var(--color-primary-hover); }
 /* ═══════════════════════════════════════
    Typography
    ═══════════════════════════════════════ */
-h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
-h2 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
-h3 { font-size: 1.125rem; font-weight: 600; }
-h4 { font-size: 1rem; font-weight: 600; }
+h1 { font-size: clamp(1.5rem, 5vw, 1.75rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.25rem, 4vw, 1.5rem); font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-size: clamp(1.1rem, 3vw, 1.125rem); font-weight: 600; }
+h4 { font-size: clamp(0.95rem, 2.5vw, 1rem); font-weight: 600; }
 
 /* ═══════════════════════════════════════
    Animations
@@ -533,15 +534,50 @@ input.input-error {
 .main-content {
   flex: 1;
   min-height: 100vh;
-  overflow-y: auto;
+  overflow-x: hidden;
   padding-bottom: 80px;
+  width: 100%;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
 }
 
 .page-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: clamp(12px, 3vw, 24px);
   animation: fadeIn 0.3s ease;
+  width: 100%;
+}
+
+.scroll-x {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+.scroll-x::-webkit-scrollbar { display: none; }
+
+.stack-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 769px) {
+  .stack-mobile { flex-direction: row; align-items: center; justify-content: space-between; }
+}
+
+.grid-responsive {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(clamp(140px, 45%, 320px), 1fr));
+  gap: clamp(12px, 2vw, 20px);
 }
 
 /* ═══════════════════════════════════════
@@ -611,6 +647,10 @@ input.input-error {
   flex-shrink: 0;
 }
 .sidebar-toggle:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+}
 
 .sidebar-nav {
   flex: 1;
@@ -737,9 +777,85 @@ input.input-error {
 }
 .fab:hover { transform: scale(1.1) rotate(90deg); box-shadow: 0 6px 28px rgba(79, 70, 229, 0.5); }
 
+.mobile-top-header {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+@media (max-width: 768px) {
+  .mobile-top-header { display: flex; }
+  .bottom-nav { display: flex; }
+}
+
 /* ═══════════════════════════════════════
-   Header
+   Mobile Drawer
    ═══════════════════════════════════════ */
+.mobile-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-overlay);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  animation: fadeIn 0.2s ease;
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background: var(--color-card);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  animation: slideInLeft 0.3s ease;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.mobile-drawer-header {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mobile-drawer-nav {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-drawer-footer {
+  padding: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.mobile-drawer-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
 .page-header {
   display: flex;
   align-items: flex-start;

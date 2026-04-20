@@ -79,7 +79,6 @@ export default function TransactionModal({
 
     setLoading(true);
     try {
-      // STRICT BALANCE VALIDATION
       if (form.type === 'expense') {
         const available = form.payment_method === 'cash' ? cashBalance : bankBalance;
         if (amt > available) {
@@ -104,7 +103,6 @@ export default function TransactionModal({
         is_split: false,
       };
 
-      // DELEGATED SUBMISSION (For Transactions Page)
       if (onSubmit) {
         await onSubmit(payload, editData?.id);
         if (onSuccess) onSuccess(); 
@@ -112,7 +110,6 @@ export default function TransactionModal({
         return;
       }
 
-      // INTERNAL SUBMISSION (For Dashboard Quick Add)
       let error;
       if (editData) {
         ({ error } = await supabase.from('transactions').update(payload).eq('id', editData.id));
@@ -168,19 +165,15 @@ export default function TransactionModal({
                 style={{
                   ...chipStyle,
                   borderColor: form.category === cat.value ? cat.color : 'var(--color-border)',
-                  background: form.category === cat.value ? `${cat.color}15` : 'var(--color-input-bg)',
-                  color: form.category === cat.value ? cat.color : 'inherit',
+                  background: form.category === cat.value ? `${cat.color}20` : 'var(--color-input-bg)',
+                  color: form.category === cat.value ? cat.color : 'var(--color-text)',
+                  fontWeight: form.category === cat.value ? '700' : '500'
                 }}>
-                <span style={{ fontSize: '16px' }}>{cat.emoji}</span>
-                <span style={{ fontSize: '11px', fontWeight: form.category === cat.value ? '600' : '400' }}>{cat.label}</span>
+                <span style={{ fontSize: '18px' }}>{cat.emoji}</span>
+                <span style={{ fontSize: 'clamp(10px, 2.5vw, 12px)' }}>{cat.label}</span>
               </button>
             ))}
           </div>
-          {form.category === 'Other' && (
-            <input type="text" placeholder="Specify category..." value={form.customCategoryName}
-              onChange={e => setForm(f => ({ ...f, customCategoryName: e.target.value }))}
-              style={inputStyle} />
-          )}
         </div>
 
         <div style={sectionStyle}>
@@ -192,37 +185,35 @@ export default function TransactionModal({
                   ...methodCardStyle,
                   flex: 1,
                   borderColor: form.payment_method === pm.value ? pm.color : 'var(--color-border)',
-                  background: form.payment_method === pm.value ? `${pm.color}10` : 'var(--color-input-bg)',
+                  background: form.payment_method === pm.value ? `${pm.color}20` : 'var(--color-input-bg)',
+                  color: form.payment_method === pm.value ? 'var(--color-text)' : 'var(--color-text-secondary)'
                 }}>
                 <pm.icon size={20} color={form.payment_method === pm.value ? pm.color : 'var(--color-text-secondary)'} />
-                <span style={{ fontSize: '14px', fontWeight: form.payment_method === pm.value ? '600' : '400' }}>{pm.label}</span>
-                <span style={{ fontSize: '10px', opacity: 0.7 }}>
+                <span style={{ fontSize: '14px', fontWeight: form.payment_method === pm.value ? '700' : '500' }}>{pm.label}</span>
+                <span style={{ fontSize: '11px', opacity: 0.8 }}>
                   ₹{(pm.value === 'cash' ? cashBalance : bankBalance).toLocaleString('en-IN')}
                 </span>
               </button>
             ))}
           </div>
-          {form.type === 'expense' && Number(form.amount) > (form.payment_method === 'cash' ? cashBalance : bankBalance) && (
-            <p style={{ color: '#ef4444', fontSize: '11px', textAlign: 'center', fontWeight: '600' }}>⚠️ Insufficient funds</p>
-          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
-            <label style={labelStyle}>Date</label>
+            <label style={labelStyle}>Date & Time</label>
             <input type="datetime-local" value={form.date_time} 
               onChange={e => setForm(f => ({ ...f, date_time: e.target.value }))} style={inputStyle} />
           </div>
           <div>
-            <label style={labelStyle}>Note</label>
-            <input type="text" placeholder="What's this for?" value={form.note} 
+            <label style={labelStyle}>Note/Description</label>
+            <input type="text" placeholder="Details..." value={form.note} 
               onChange={e => setForm(f => ({ ...f, note: e.target.value }))} style={inputStyle} />
           </div>
         </div>
 
         <button type="submit" disabled={loading} style={{
           ...submitBtnStyle,
-          background: form.type === 'expense' ? '#1a1a2e' : '#22c55e'
+          background: form.type === 'expense' ? 'var(--color-primary)' : '#22c55e'
         }}>
           {loading ? 'Processing...' : `Confirm ${form.type === 'expense' ? 'Debit' : 'Credit'}`}
         </button>
@@ -231,17 +222,17 @@ export default function TransactionModal({
   );
 }
 
-const formStyle = { display: 'flex', flexDirection: 'column', gap: '20px' };
-const typeToggleStyle = { display: 'flex', padding: '4px', background: 'var(--color-input-bg)', borderRadius: '12px', gap: '4px' };
-const typeBtnStyle = { flex: 1, padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600', transition: 'all 0.2s' };
-const amountSectionStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 0', borderBottom: '1px solid var(--color-border)' };
-const rupeeStyle = { fontSize: '24px', fontWeight: '700', color: 'var(--color-primary)' };
-const amountInputStyle = { border: 'none', background: 'transparent', fontSize: '36px', fontWeight: '800', textAlign: 'center', width: '180px', color: 'inherit', outline: 'none' };
-const sectionStyle = { display: 'flex', flexDirection: 'column', gap: '10px' };
-const labelStyle = { fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.5px' };
-const chipGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: '8px' };
-const chipStyle = { display: 'flex', alignItems: 'center', gap: '6px', padding: '8px', borderRadius: '10px', border: '1px solid', cursor: 'pointer', transition: 'all 0.2s' };
+const formStyle = { display: 'flex', flexDirection: 'column', gap: '18px' };
+const typeToggleStyle = { display: 'flex', padding: '4px', background: 'var(--color-muted)', borderRadius: '12px', gap: '4px' };
+const typeBtnStyle = { flex: 1, padding: '12px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '700', transition: 'all 0.2s' };
+const amountSectionStyle = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px 0', borderBottom: '1.5px solid var(--color-border)' };
+const rupeeStyle = { fontSize: '28px', fontWeight: '800', color: 'var(--color-primary)' };
+const amountInputStyle = { border: 'none', background: 'transparent', fontSize: 'clamp(32px, 8vw, 42px)', fontWeight: '800', textAlign: 'center', width: '100%', color: 'var(--color-text)', outline: 'none' };
+const sectionStyle = { display: 'flex', flexDirection: 'column', gap: '8px' };
+const labelStyle = { fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.8px' };
+const chipGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: '8px' };
+const chipStyle = { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px', borderRadius: '12px', border: '1.5px solid', cursor: 'pointer', transition: 'all 0.2s' };
 const methodGridStyle = { display: 'flex', gap: '12px' };
-const methodCardStyle = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', padding: '12px', borderRadius: '12px', border: '1.5px solid', cursor: 'pointer', transition: 'all 0.2s' };
-const inputStyle = { width: '100%', padding: '12px', background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: '10px', color: 'inherit', fontSize: '13px' };
-const submitBtnStyle = { padding: '14px', borderRadius: '12px', border: 'none', color: 'white', fontWeight: '700', fontSize: '15px', cursor: 'pointer', marginTop: '10px' };
+const methodCardStyle = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px', borderRadius: '14px', border: '1.5px solid', cursor: 'pointer', transition: 'all 0.2s' };
+const inputStyle = { width: '100%', padding: '14px', background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: '12px', color: 'var(--color-text)', fontSize: '14px', fontWeight: '500', outline: 'none' };
+const submitBtnStyle = { padding: '16px', borderRadius: '14px', border: 'none', color: 'white', fontWeight: '800', fontSize: '16px', cursor: 'pointer', marginTop: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' };

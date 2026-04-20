@@ -6,12 +6,13 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import {
   Plus, Menu, X, Wallet, Sun, Moon,
-  LayoutDashboard, ArrowLeftRight, Target, BarChart3, User, LogOut
+  LayoutDashboard, ArrowLeftRight, Target, BarChart3, User, LogOut, HandCoins
 } from 'lucide-react'
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { path: '/loans', label: 'Loans', icon: HandCoins },
   { path: '/goals', label: 'Savings & Goals', icon: Target },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/profile', label: 'Profile', icon: User }
@@ -114,14 +115,6 @@ export default function Layout() {
         <Outlet />
       </main>
       <BottomNav />
-      <button
-        className="fab"
-        onClick={() => navigate('/transactions?addNew=true')}
-        aria-label="Quick add transaction"
-        title="Add Transaction"
-      >
-        <Plus size={24} />
-      </button>
     </div>
   )
 }
