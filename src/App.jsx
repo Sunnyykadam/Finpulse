@@ -9,6 +9,7 @@ import Transactions from './pages/Transactions'
 import Goals from './pages/Goals'
 import Analytics from './pages/Analytics'
 import Profile from './pages/Profile'
+import Loans from './pages/Loans'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -41,6 +42,7 @@ function AppRoutes() {
         <Route path="transactions" element={<Transactions />} />
         <Route path="goals" element={<Goals />} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="loans" element={<Loans />} />
         <Route path="profile" element={<Profile />} />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />

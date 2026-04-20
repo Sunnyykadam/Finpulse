@@ -4,12 +4,13 @@ import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import {
   LayoutDashboard, ArrowLeftRight, Target, BarChart3,
-  User, LogOut, ChevronLeft, ChevronRight, Wallet
+  User, LogOut, ChevronLeft, ChevronRight, Wallet, HandCoins
 } from 'lucide-react'
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/transactions', label: 'Transactions', icon: ArrowLeftRight },
+  { path: '/loans', label: 'Loans', icon: HandCoins },
   { path: '/goals', label: 'Savings & Goals', icon: Target },
   { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/profile', label: 'Profile', icon: User }

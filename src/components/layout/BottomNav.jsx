@@ -20,8 +20,12 @@ export default function BottomNav() {
           to={item.path}
           className={({ isActive }) => `bottom-nav-item ${isActive ? 'active' : ''}`}
         >
-          <item.icon size={20} strokeWidth={isActive => isActive ? 2.5 : 2} />
-          <span>{item.label}</span>
+          {({ isActive }) => (
+            <>
+              <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+              <span>{item.label}</span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
