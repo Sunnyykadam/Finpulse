@@ -121,10 +121,10 @@ export default function Transactions() {
 
   const handleExport = () => {
     if (transactions.length === 0) return toast.error('No data')
-    const headers = ['Date', 'Type', 'Category', 'Amount', 'Method', 'Note']
+    const headers = ['Date', 'Type', 'Category', 'Account', 'Note', 'Amount']
     const content = transactions.map(t => [
       format(new Date(t.date_time), 'yyyy-MM-dd HH:mm'),
-      t.type, t.category, t.amount, t.payment_method, t.note
+      t.type, t.category, t.payment_method, t.note, t.amount
     ])
     const csv = [headers, ...content].map(row => row.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -136,71 +136,75 @@ export default function Transactions() {
   }
 
   return (
-    <div className="page-container">
+    <div className="page-container" style={{ padding: 'clamp(12px, 3vw, 24px)' }}>
       <style>{`
-        .tx-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; }
-        .summary-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
-        .summary-card { background: var(--color-card); padding: clamp(12px, 3vw, 16px); border-radius: 16px; border: 1px solid var(--color-border); display: flex; align-items: center; gap: 12px; }
-        .summary-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .summary-label { font-size: 10px; font-weight: 700; opacity: 0.6; letter-spacing: 0.5px; color: var(--color-text); }
-        .summary-value { font-size: clamp(14px, 4vw, 18px); font-weight: 800; color: var(--color-text); }
+        .tx-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+        .tx-title-section h1 { margin: 0; fontSize: clamp(20px, 4vw, 28px); fontWeight: 800; }
+        .tx-title-section p { color: var(--color-text-secondary); fontSize: clamp(11px, 2.5vw, 13px); marginTop: 2px; }
+
+        .summary-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+        .summary-card { background: var(--color-card); padding: 12px; border-radius: 12px; border: 1px solid var(--color-border); display: flex; align-items: center; gap: 10px; }
+        .summary-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .summary-label { font-size: 9px; font-weight: 700; opacity: 0.6; letter-spacing: 0.5px; text-transform: uppercase; color: var(--color-text); }
+        .summary-value { font-size: clamp(13px, 3.5vw, 16px); font-weight: 800; color: var(--color-text); }
         
-        .filter-pill { padding: 6px 12px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-input-bg); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.2s; white-space: nowrap; color: var(--color-text); }
+        .filters-strip { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+        .filter-pill { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-input-bg); cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.2s; white-space: nowrap; color: var(--color-text); }
         .filter-pill.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
         
-        .tx-professional-table { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
-        .tx-professional-table th { padding: 10px 16px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #fff; font-weight: 800; }
-        .tx-professional-table td { background: var(--color-card); padding: 12px 16px; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); font-size: 13px; color: var(--color-text); }
-        .tx-professional-table td:first-child { border-left: 1px solid var(--color-border); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
-        .tx-professional-table td:last-child { border-right: 1px solid var(--color-border); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
-        .tx-professional-table tr:hover td { background: var(--color-muted); }
+        .tx-professional-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; min-width: 600px; }
+        .tx-professional-table th { padding: 8px 12px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #fff; font-weight: 800; }
+        .tx-professional-table td { background: var(--color-card); padding: 10px 12px; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); font-size: 12px; color: var(--color-text); }
+        .tx-professional-table td:first-child { border-left: 1px solid var(--color-border); border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+        .tx-professional-table td:last-child { border-right: 1px solid var(--color-border); border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+        
+        .high-contrast-label { color: #fff !important; font-weight: 800 !important; text-transform: uppercase; font-size: 10px; margin-bottom: 4px; display: block; }
+        .high-contrast-input { background: #000 !important; border: 1px solid #333 !important; color: #fff !important; padding: 10px !important; border-radius: 8px !important; width: 100%; font-size: 13px; }
 
-        .high-contrast-label { color: #fff !important; font-weight: 800 !important; text-transform: uppercase; font-size: 11px; margin-bottom: 6px; display: block; }
-        .high-contrast-input { background: #000 !important; border: 1px solid #333 !important; color: #fff !important; padding: 12px !important; border-radius: 10px !important; width: 100%; }
+        /* Force table view even on mobile */
+        .table-wrap { overflow-x: auto; margin-top: 8px; border-radius: 12px; -webkit-overflow-scrolling: touch; }
       `}</style>
 
       <div className="tx-header">
-        <div>
-          <h1 style={{ margin: 0, fontSize: '28px' }}>Transactions</h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginTop: '4px' }}>Analyze and track your financial flow</p>
+        <div className="tx-title-section">
+          <h1>Transactions</h1>
+          <p>Financial history & analysis</p>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn-ghost" onClick={() => setShowFilters(!showFilters)}>
-            <ListFilter size={18} /> Filters
-          </button>
-          <button className="btn btn-ghost" onClick={handleExport}><Download size={18} /></button>
-          <button className="btn btn-primary" onClick={() => { setEditData(null); setModalOpen(true) }}>
-            <Plus size={18} /> <span>New Record</span>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowFilters(!showFilters)}><ListFilter size={15} /> Filters</button>
+          <button className="btn btn-ghost btn-sm" onClick={handleExport}><Download size={15} /></button>
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditData(null); setModalOpen(true) }}>
+            <Plus size={15} /> <span>New</span>
           </button>
         </div>
       </div>
 
       <div className="summary-row">
         <div className="summary-card">
-          <div className="summary-icon" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}><TrendingUp size={20} /></div>
+          <div className="summary-icon" style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e' }}><TrendingUp size={16} /></div>
           <div>
-            <div className="summary-label">TOTAL CREDIT</div>
+            <div className="summary-label">CREDIT</div>
             <div className="summary-value">₹{totals.income.toLocaleString('en-IN')}</div>
           </div>
         </div>
         <div className="summary-card">
-          <div className="summary-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><TrendingDown size={20} /></div>
+          <div className="summary-icon" style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444' }}><TrendingDown size={16} /></div>
           <div>
-            <div className="summary-label">TOTAL DEBIT</div>
+            <div className="summary-label">DEBIT</div>
             <div className="summary-value">₹{totals.expense.toLocaleString('en-IN')}</div>
           </div>
         </div>
       </div>
 
-      <div className="scroll-x" style={{ marginBottom: '20px', gap: '8px' }}>
+      <div className="scroll-x filters-strip">
         {['All', 'This Week', 'This Month'].map(t => (
           <button key={t} className={`filter-pill ${timePeriod === t ? 'active' : ''}`} onClick={() => setTimePeriod(t)}>{t}</button>
         ))}
       </div>
 
       {showFilters && (
-        <div className="card" style={{ marginBottom: 20, background: '#111', border: '1px solid #333' }}>
-          <div className="grid-responsive" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+        <div className="card" style={{ marginBottom: 16, background: '#111', border: '1px solid #333', padding: '16px' }}>
+          <div className="grid-responsive" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             <div className="form-group">
               <label className="high-contrast-label">Search Detail</label>
               <input type="text" className="high-contrast-input" placeholder="Keyword..." value={draftFilters.search} onChange={e => setDraftFilters({...draftFilters, search: e.target.value})} />
@@ -214,17 +218,17 @@ export default function Transactions() {
               <input type="date" className="high-contrast-input" value={draftFilters.dateTo} onChange={e => setDraftFilters({...draftFilters, dateTo: e.target.value})} />
             </div>
           </div>
-          <div className="form-actions" style={{ marginTop: 16 }}>
-            <button className="btn btn-primary" onClick={() => { setFilters(draftFilters); setShowFilters(false) }}>Apply Filters</button>
-            <button className="btn btn-ghost" onClick={() => { 
+          <div className="form-actions" style={{ marginTop: 12, justifyContent: 'flex-start', gap: '8px' }}>
+            <button className="btn btn-primary btn-sm" onClick={() => { setFilters(draftFilters); setShowFilters(false) }}>Apply</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { 
                const reset = { dateFrom: '', dateTo: '', types: [], categories: [], methods: [], search: '', sortBy: 'date_time', sortDir: 'desc' };
                setDraftFilters(reset); setFilters(reset); setShowFilters(false);
-            }} style={{ color: '#fff' }}>Clear All</button>
+            }} style={{ color: '#fff' }}>Clear</button>
           </div>
         </div>
       )}
 
-      <div className="table-responsive">
+      <div className="table-wrap">
         <table className="tx-professional-table">
           <thead>
             <tr>
@@ -239,7 +243,7 @@ export default function Transactions() {
           </thead>
           <tbody>
             {loading ? (
-              [1,2,3,4,5].map(i => <tr key={i}><td colSpan={7} style={{ textAlign: 'center', opacity: 0.5 }}>Loading...</td></tr>)
+              [1,2,3,4,5].map(i => <tr key={i}><td colSpan={7} style={{ textAlign: 'center', padding: '16px', opacity: 0.5 }}>Loading...</td></tr>)
             ) : transactions.length === 0 ? (
               <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, opacity: 0.5 }}>No records found</td></tr>
             ) : (
@@ -248,26 +252,27 @@ export default function Transactions() {
                 const PayIcon = getPayIcon(t.payment_method)
                 return (
                   <tr key={t.id}>
-                    <td><div style={{ fontWeight: 700 }}>{format(new Date(t.date_time), 'MMM dd')}</div><div style={{ fontSize: '11px', opacity: 0.6 }}>{format(new Date(t.date_time), 'HH:mm')}</div></td>
+                    <td><div style={{ fontWeight: 700 }}>{format(new Date(t.date_time), 'MMM dd')}</div><div style={{ fontSize: '10px', opacity: 0.5 }}>{format(new Date(t.date_time), 'HH:mm')}</div></td>
                     <td>
                       <span className="badge" style={{ 
-                        background: isInc ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        background: isInc ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                         color: isInc ? '#22c55e' : '#ef4444',
-                        fontWeight: 700,
-                        fontSize: '11px',
-                        textTransform: 'uppercase'
+                        fontWeight: 800,
+                        fontSize: '9px',
+                        textTransform: 'uppercase',
+                        padding: '2px 6px'
                       }}>
                         {isInc ? 'Credit' : 'Debit'}
                       </span>
                     </td>
-                    <td><div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span>{getCatEmoji(t.category)}</span><span style={{ fontWeight: 600 }}>{t.category}</span></div></td>
-                    <td><div className="badge badge-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><PayIcon size={12} /> {t.payment_method}</div></td>
-                    <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.8 }}>{t.note || '—'}</td>
-                    <td style={{ fontWeight: 800, color: isInc ? '#22c55e' : '#ef4444', fontSize: '15px' }}>{isInc ? '+' : '-'}₹{t.amount.toLocaleString('en-IN')}</td>
+                    <td><div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span>{getCatEmoji(t.category)}</span><span style={{ fontWeight: 600 }}>{t.category}</span></div></td>
+                    <td><div className="badge badge-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px' }}><PayIcon size={10} /> {t.payment_method}</div></td>
+                    <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.7 }}>{t.note || '—'}</td>
+                    <td style={{ fontWeight: 800, color: isInc ? '#22c55e' : '#ef4444', fontSize: '13px' }}>{isInc ? '+' : '-'}₹{t.amount.toLocaleString('en-IN')}</td>
                     <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                        <button className="icon-btn" onClick={() => { setEditData(t); setModalOpen(true) }}><Edit2 size={14} /></button>
-                        <button className="icon-btn danger" onClick={() => setDeleteConfirm(t.id)}><Trash2 size={14} /></button>
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                        <button className="icon-btn" onClick={() => { setEditData(t); setModalOpen(true) }} style={{ width: 28, height: 28 }}><Edit2 size={12} /></button>
+                        <button className="icon-btn danger" onClick={() => setDeleteConfirm(t.id)} style={{ width: 28, height: 28 }}><Trash2 size={12} /></button>
                       </div>
                     </td>
                   </tr>
@@ -278,9 +283,9 @@ export default function Transactions() {
         </table>
       </div>
 
-      <div className="pagination" style={{ marginTop: 24, padding: '0 8px' }}>
+      <div className="pagination" style={{ marginTop: 20, padding: '0 8px' }}>
         <button className="btn btn-ghost btn-sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}><ChevronLeft size={16} /></button>
-        <span style={{ fontSize: '13px', fontWeight: 600 }}>Page {page + 1} of {totalPages || 1}</span>
+        <span style={{ fontSize: '12px', fontWeight: 700 }}>Page {page + 1} of {totalPages || 1}</span>
         <button className="btn btn-ghost btn-sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}><ChevronRight size={16} /></button>
       </div>
 
@@ -295,12 +300,12 @@ export default function Transactions() {
 
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-content modal-sm" onClick={e => e.stopPropagation()} style={{ padding: 24 }}>
-            <h3 style={{ marginBottom: 12 }}>Delete Transaction?</h3>
-            <p style={{ marginBottom: 20, opacity: 0.7, fontSize: 14 }}>This action is permanent and cannot be undone.</p>
-            <div className="form-actions">
-              <button className="btn btn-ghost" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn btn-danger" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
+          <div className="modal-content modal-sm" onClick={e => e.stopPropagation()} style={{ padding: '20px', borderRadius: '16px' }}>
+            <h3 style={{ marginBottom: '8px', fontSize: '16px' }}>Delete Record?</h3>
+            <p style={{ marginBottom: '16px', opacity: 0.7, fontSize: '13px' }}>This action cannot be undone.</p>
+            <div className="form-actions" style={{ gap: '8px' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
             </div>
           </div>
         </div>
