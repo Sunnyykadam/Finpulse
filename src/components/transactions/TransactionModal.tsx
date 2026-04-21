@@ -218,8 +218,13 @@ export default function TransactionModal({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
             <label style={labelStyle}>Date & Time</label>
-            <input type="datetime-local" value={form.date_time} 
-              onChange={e => setForm(f => ({ ...f, date_time: e.target.value }))} style={inputStyle} />
+            <input 
+              type="datetime-local" 
+              value={form.date_time} 
+              onChange={e => setForm(f => ({ ...f, date_time: e.target.value }))} 
+              style={{ ...inputStyle, opacity: editData ? 0.6 : 1, cursor: editData ? 'not-allowed' : 'text' }}
+              readOnly={!!editData} 
+            />
           </div>
           <div>
             <label style={labelStyle}>Note/Description</label>

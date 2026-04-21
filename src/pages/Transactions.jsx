@@ -38,7 +38,6 @@ export default function Transactions() {
   const [transactions, setTransactions] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
   const [editData, setEditData] = useState(null)
-  const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   
   const [page, setPage] = useState(0)
@@ -107,17 +106,6 @@ export default function Transactions() {
     }, { income: 0, expense: 0 })
   }, [transactions])
 
-  const handleDelete = async (id) => {
-    try {
-      const { error } = await supabase.from('transactions').delete().eq('id', id)
-      if (error) throw error
-      toast.success('Deleted')
-      setDeleteConfirm(null)
-      fetchTransactions()
-    } catch (err) {
-      toast.error('Delete failed')
-    }
-  }
 
   const handleExport = () => {
     if (transactions.length === 0) return toast.error('No data')
@@ -272,7 +260,6 @@ export default function Transactions() {
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
                         <button className="icon-btn" onClick={() => { setEditData(t); setModalOpen(true) }} style={{ width: 28, height: 28 }}><Edit2 size={12} /></button>
-                        <button className="icon-btn danger" onClick={() => setDeleteConfirm(t.id)} style={{ width: 28, height: 28 }}><Trash2 size={12} /></button>
                       </div>
                     </td>
                   </tr>
@@ -298,18 +285,6 @@ export default function Transactions() {
         bankBalance={profile?.bank_balance || 0}
       />
 
-      {deleteConfirm && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div className="modal-content modal-sm" onClick={e => e.stopPropagation()} style={{ padding: '20px', borderRadius: '16px' }}>
-            <h3 style={{ marginBottom: '8px', fontSize: '16px' }}>Delete Record?</h3>
-            <p style={{ marginBottom: '16px', opacity: 0.7, fontSize: '13px' }}>This action cannot be undone.</p>
-            <div className="form-actions" style={{ gap: '8px' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>Cancel</button>
-              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(deleteConfirm)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
