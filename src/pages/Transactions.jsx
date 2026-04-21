@@ -3,13 +3,14 @@ import {
   Plus, Filter, Download, Search, Edit2, Trash2, 
   ChevronLeft, ChevronRight, X, Calendar as CalendarIcon, 
   Landmark, Banknote, CreditCard, TrendingUp, TrendingDown,
-  ArrowUpRight, ArrowDownLeft, MoreVertical, ListFilter
+  ArrowUpRight, ArrowDownLeft, MoreVertical, ListFilter, Eye
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { format } from 'date-fns'
 import toast from 'react-hot-toast'
 import TransactionModal from '../components/transactions/TransactionModal'
+import Modal from '../components/ui/Modal'
 
 const PAGE_SIZE = 15
 
@@ -26,7 +27,6 @@ const CATEGORIES = [
   { value: 'loan_repayment', label: 'Repayment', emoji: '💸', color: '#22c55e' },
 ]
 
-
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash', icon: Banknote },
   { value: 'bank', label: 'Bank', icon: Landmark }
@@ -40,6 +40,8 @@ export default function Transactions() {
   const [loading, setLoading] = useState(true)
   const [transactions, setTransactions] = useState([])
   const [modalOpen, setModalOpen] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [viewData, setViewData] = useState(null)
   const [editData, setEditData] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   
@@ -126,6 +128,18 @@ export default function Transactions() {
     a.click()
   }
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this transaction? This cannot be undone.')) return
+    try {
+      const { error } = await supabase.from('transactions').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Deleted')
+      fetchTransactions()
+    } catch (err) {
+      toast.error('Failed to delete')
+    }
+  }
+
   return (
     <div className="page-container" style={{ padding: 'clamp(12px, 3vw, 24px)' }}>
       <style>{`
@@ -143,16 +157,19 @@ export default function Transactions() {
         .filter-pill { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-input-bg); cursor: pointer; font-size: 11px; font-weight: 700; transition: all 0.2s; white-space: nowrap; color: var(--color-text); }
         .filter-pill.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
         
-        .tx-professional-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; min-width: 600px; }
-        .tx-professional-table th { padding: 8px 12px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #fff; font-weight: 800; }
-        .tx-professional-table td { background: var(--color-card); padding: 10px 12px; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); font-size: 12px; color: var(--color-text); }
-        .tx-professional-table td:first-child { border-left: 1px solid var(--color-border); border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
-        .tx-professional-table td:last-child { border-right: 1px solid var(--color-border); border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+        .tx-professional-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; min-width: 800px; }
+        .tx-professional-table th { padding: 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #fff; font-weight: 800; opacity: 0.7; }
+        .tx-professional-table td { background: var(--color-card); padding: 12px; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); font-size: 13px; color: var(--color-text); }
+        .tx-professional-table td:first-child { border-left: 1px solid var(--color-border); border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+        .tx-professional-table td:last-child { border-right: 1px solid var(--color-border); border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
         
         .high-contrast-label { color: #fff !important; font-weight: 800 !important; text-transform: uppercase; font-size: 10px; margin-bottom: 4px; display: block; }
         .high-contrast-input { background: #000 !important; border: 1px solid #333 !important; color: #fff !important; padding: 10px !important; border-radius: 8px !important; width: 100%; font-size: 13px; }
 
-        /* Force table view even on mobile */
+        .detail-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
+        .detail-label { opacity: 0.6; font-size: 13px; }
+        .detail-value { font-weight: 700; font-size: 14px; }
+
         .table-wrap { overflow-x: auto; margin-top: 8px; border-radius: 12px; -webkit-overflow-scrolling: touch; }
       `}</style>
 
@@ -211,7 +228,6 @@ export default function Transactions() {
           </div>
           
           <div style={{ marginTop: 16 }}>
-
             <label className="high-contrast-label">Categories</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: 8 }}>
               {CATEGORIES.map(cat => (
@@ -258,29 +274,35 @@ export default function Transactions() {
         <table className="tx-professional-table">
           <thead>
             <tr>
-              <th>Date</th>
+              <th>Sr. No</th>
+              <th>Date & Time</th>
               <th>Type</th>
               <th>Category</th>
-              <th>Account</th>
-              <th>Note</th>
+              <th>Method</th>
+              <th>Notes</th>
               <th>Amount</th>
-              <th></th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              [1,2,3,4,5].map(i => <tr key={i}><td colSpan={7} style={{ textAlign: 'center', padding: '16px', opacity: 0.5 }}>Loading...</td></tr>)
+              [1,2,3,4,5].map(i => <tr key={i}><td colSpan={8} style={{ textAlign: 'center', padding: '16px', opacity: 0.5 }}>Loading...</td></tr>)
             ) : transactions.length === 0 ? (
-              <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, opacity: 0.5 }}>No records found</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: 'center', padding: 40, opacity: 0.5 }}>No records found</td></tr>
             ) : (
-              transactions.map(t => {
+              transactions.map((t, index) => {
                 const isInc = t.type === 'income'
                 const PayIcon = getPayIcon(t.payment_method)
                 const isSystem = t.source === 'loan' || t.source === 'loan_repayment'
+                const srNo = (page * PAGE_SIZE) + index + 1
                 
                 return (
-                  <tr key={t.id} title={isSystem ? "This transaction was automatically created by a loan action. Manage it from the Loans page." : ""}>
-                    <td><div style={{ fontWeight: 700 }}>{format(new Date(t.date_time), 'MMM dd')}</div><div style={{ fontSize: '10px', opacity: 0.5 }}>{format(new Date(t.date_time), 'HH:mm')}</div></td>
+                  <tr key={t.id}>
+                    <td><span style={{ opacity: 0.5, fontWeight: 700 }}>{srNo}</span></td>
+                    <td>
+                      <div style={{ fontWeight: 700 }}>{format(new Date(t.date_time), 'MMM dd')}</div>
+                      <div style={{ fontSize: '10px', opacity: 0.5 }}>{format(new Date(t.date_time), 'HH:mm')}</div>
+                    </td>
                     <td>
                       <span className="badge" style={{ 
                         background: isInc ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
@@ -305,19 +327,22 @@ export default function Transactions() {
                       </div>
                     </td>
                     <td><div className="badge badge-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px' }}><PayIcon size={10} /> {t.payment_method}</div></td>
-                    <td style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.7 }}>{t.note || '—'}</td>
-                    <td style={{ fontWeight: 800, color: isInc ? '#22c55e' : '#ef4444', fontSize: '13px' }}>{isInc ? '+' : '-'}₹{t.amount.toLocaleString('en-IN')}</td>
-                    <td style={{ textAlign: 'right' }}>
-                      {!isSystem && (
-                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
-                          <button className="icon-btn" onClick={() => { setEditData(t); setModalOpen(true) }} style={{ width: 28, height: 28 }}><Edit2 size={12} /></button>
-                        </div>
-                      )}
+                    <td style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.7 }}>{t.note || '—'}</td>
+                    <td style={{ fontWeight: 800, color: isInc ? '#22c55e' : '#ef4444', fontSize: '14px' }}>{isInc ? '+' : '-'}₹{t.amount.toLocaleString('en-IN')}</td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-start' }}>
+                        <button className="icon-btn" onClick={() => { setViewData(t); setDetailOpen(true) }} title="View Details" style={{ width: 30, height: 30 }}><Eye size={14} /></button>
+                        {!isSystem && (
+                          <>
+                            <button className="icon-btn" onClick={() => { setEditData(t); setModalOpen(true) }} title="Edit" style={{ width: 30, height: 30 }}><Edit2 size={14} /></button>
+                            <button className="icon-btn" onClick={() => handleDelete(t.id)} title="Delete" style={{ width: 30, height: 30, color: '#ef4444' }}><Trash2 size={14} /></button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
               })
-
             )}
           </tbody>
         </table>
@@ -338,6 +363,57 @@ export default function Transactions() {
         bankBalance={profile?.bank_balance || 0}
       />
 
+      <Modal isOpen={detailOpen} onClose={() => setDetailOpen(false)} title="Transaction Details" size="sm">
+        {viewData && (
+          <div className="transaction-details-content">
+             <div style={{ textAlign: 'center', padding: '20px 0', borderBottom: '1px solid var(--color-border)', marginBottom: 16 }}>
+                <div style={{ fontSize: '40px', marginBottom: 12 }}>{getCatEmoji(viewData.category)}</div>
+                <h2 style={{ margin: 0, fontSize: '24px', fontWeight: 800, color: viewData.type === 'income' ? '#22c55e' : '#ef4444' }}>
+                  {viewData.type === 'income' ? '+' : '-'}₹{viewData.amount.toLocaleString('en-IN')}
+                </h2>
+                <div style={{ fontSize: '12px', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '1px', marginTop: 4 }}>
+                   {viewData.category} • {viewData.type}
+                </div>
+             </div>
+
+             <div className="detail-row">
+                <span className="detail-label">Date & Time</span>
+                <span className="detail-value">{format(new Date(viewData.date_time), 'PPP p')}</span>
+             </div>
+             <div className="detail-row">
+                <span className="detail-label">Payment Method</span>
+                <span className="detail-value" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                   {(() => { const Icon = getPayIcon(viewData.payment_method); return <Icon size={14} /> })()}
+                   {viewData.payment_method.toUpperCase()}
+                </span>
+             </div>
+             <div className="detail-row">
+                <span className="detail-label">Status</span>
+                <span className="detail-value" style={{ color: '#22c55e' }}>Completed</span>
+             </div>
+             {viewData.source && (
+               <div className="detail-row">
+                  <span className="detail-label">Source</span>
+                  <span className="detail-value badge" style={{ background: 'var(--color-primary)', color: 'white', fontSize: '10px' }}>
+                    {viewData.source.toUpperCase()}
+                  </span>
+               </div>
+             )}
+             <div style={{ marginTop: 16 }}>
+                <span className="detail-label" style={{ display: 'block', marginBottom: 8 }}>Note / Description</span>
+                <div style={{ background: 'var(--color-muted)', padding: 12, borderRadius: 8, fontSize: '14px', fontStyle: viewData.note ? 'normal' : 'italic', opacity: viewData.note ? 1 : 0.5 }}>
+                   {viewData.note || 'No notes provided for this transaction.'}
+                </div>
+             </div>
+
+             <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
+                <button className="btn btn-ghost btn-full" onClick={() => setDetailOpen(false)}>Close</button>
+             </div>
+          </div>
+        )}
+      </Modal>
+
     </div>
   )
 }
+
